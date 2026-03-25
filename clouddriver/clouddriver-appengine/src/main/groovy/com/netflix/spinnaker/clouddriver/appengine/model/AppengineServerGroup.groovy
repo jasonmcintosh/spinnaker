@@ -16,7 +16,7 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.model
 
-import com.google.api.services.appengine.v1.model.Version
+import com.google.appengine.v1.Version
 import com.netflix.spinnaker.clouddriver.appengine.AppengineCloudProvider
 import com.netflix.spinnaker.clouddriver.model.HealthState
 import com.netflix.spinnaker.clouddriver.model.ServerGroup
@@ -56,7 +56,12 @@ class AppengineServerGroup implements ServerGroup, Serializable {
     this.createdTime = AppengineModelUtil.translateTime(version.getCreateTime())
     this.disabled = isDisabled
     this.scalingPolicy = AppengineModelUtil.getScalingPolicy(version)
-    this.servingStatus = version.getServingStatus() ? ServingStatus.valueOf(version.getServingStatus()) : null
+    def versionServingStatus = version.getServingStatus()
+    if (versionServingStatus != null && versionServingStatus.name() != "UNRECOGNIZED") {
+      this.servingStatus = ServingStatus.valueOf(versionServingStatus.name())
+    } else {
+      this.servingStatus = null
+    }
     this.env = version.getEnv() ? Environment.valueOf(version.getEnv().toUpperCase()) : null
     this.httpUrl = AppengineModelUtil.getHttpUrl(version.getName())
     this.httpsUrl = AppengineModelUtil.getHttpsUrl(version.getName())
@@ -89,7 +94,12 @@ class AppengineServerGroup implements ServerGroup, Serializable {
     this.createdTime = AppengineModelUtil.translateTime(version.getCreateTime())
     this.disabled = isDisabled
     this.scalingPolicy = AppengineModelUtil.getScalingPolicy(version)
-    this.servingStatus = version.getServingStatus() ? ServingStatus.valueOf(version.getServingStatus()) : null
+    def versionServingStatus = version.getServingStatus()
+    if (versionServingStatus != null && versionServingStatus.name() != "UNRECOGNIZED") {
+      this.servingStatus = ServingStatus.valueOf(versionServingStatus.name())
+    } else {
+      this.servingStatus = null
+    }
     this.env = version.getEnv() ? Environment.valueOf(version.getEnv().toUpperCase()) : null
     this.httpUrl = AppengineModelUtil.getHttpUrl(version.getName())
     this.httpsUrl = AppengineModelUtil.getHttpsUrl(version.getName())
@@ -156,7 +166,9 @@ class AppengineServerGroup implements ServerGroup, Serializable {
   static Boolean versionAllowsGradualTrafficMigration(Version version) {
     // Versions do not always have an env property if they are in the standard environment.
     def inStandardEnvironment = version.getEnv()?.toUpperCase() != "FLEXIBLE"
-    def warmupRequestsConfigured = (version.getInboundServices() ?: []).contains("INBOUND_SERVICE_WARMUP")
+    def warmupRequestsConfigured = version.getInboundServicesList()?.any {
+      it.name() == "INBOUND_SERVICE_WARMUP"
+    }
     def usesAutomaticScaling = AppengineModelUtil.getScalingPolicy(version).type == ScalingPolicyType.AUTOMATIC
     return inStandardEnvironment && warmupRequestsConfigured && usesAutomaticScaling
   }

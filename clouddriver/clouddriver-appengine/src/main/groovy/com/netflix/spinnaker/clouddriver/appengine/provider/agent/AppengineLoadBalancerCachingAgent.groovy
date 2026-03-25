@@ -18,7 +18,9 @@ package com.netflix.spinnaker.clouddriver.appengine.provider.agent
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.google.api.services.appengine.v1.model.Service
+import com.google.appengine.v1.ListServicesRequest
+import com.google.appengine.v1.Service
+import com.google.appengine.v1.ServicesClient
 import com.netflix.spectator.api.Registry
 import com.netflix.spinnaker.cats.agent.AgentDataType
 import com.netflix.spinnaker.cats.agent.CacheResult
@@ -235,11 +237,35 @@ class AppengineLoadBalancerCachingAgent extends AbstractAppengineCachingAgent im
 
   Service loadService(String loadBalancerName) {
     def project = credentials.project
-    return credentials.appengine.apps().services().get(project, loadBalancerName).execute()
+    try {
+      ServicesClient servicesClient = credentials.credentials.getServicesClient()
+      try {
+        def serviceName = "apps/${project}/services/${loadBalancerName}"
+        return servicesClient.getService(serviceName)
+      } finally {
+        servicesClient.close()
+      }
+    } catch (Exception e) {
+      log.error("Error loading service ${loadBalancerName}", e)
+      return null
+    }
   }
 
   List<Service> loadServices() {
     def project = credentials.project
-    return credentials.appengine.apps().services().list(project).execute().getServices()
+    try {
+      ServicesClient servicesClient = credentials.credentials.getServicesClient()
+      try {
+        def listServicesRequest = ListServicesRequest.newBuilder()
+            .setParent("apps/${project}")
+            .build()
+        return servicesClient.listServices(listServicesRequest).iterateAll().toList()
+      } finally {
+        servicesClient.close()
+      }
+    } catch (Exception e) {
+      log.error("Error loading services", e)
+      return []
+    }
   }
 }

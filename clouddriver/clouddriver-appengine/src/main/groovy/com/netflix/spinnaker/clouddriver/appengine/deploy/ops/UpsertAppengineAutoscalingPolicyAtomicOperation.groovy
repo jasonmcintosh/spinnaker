@@ -16,9 +16,12 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy.ops
 
-import com.google.api.services.appengine.v1.model.AutomaticScaling
-import com.google.api.services.appengine.v1.model.Operation
-import com.google.api.services.appengine.v1.model.Version
+import com.google.appengine.v1.AutomaticScaling
+import com.google.appengine.v1.UpdateVersionRequest
+import com.google.appengine.v1.Version
+import com.google.appengine.v1.VersionsClient
+import com.google.longrunning.Operation
+import com.google.protobuf.FieldMask
 import com.netflix.spinnaker.clouddriver.appengine.deploy.AppengineSafeRetry
 import com.netflix.spinnaker.clouddriver.appengine.deploy.description.UpsertAppengineAutoscalingPolicyDescription
 import com.netflix.spinnaker.clouddriver.appengine.deploy.exception.AppengineResourceNotFoundException
@@ -68,10 +71,22 @@ class UpsertAppengineAutoscalingPolicyAtomicOperation extends AppengineAtomicOpe
       throw new AppengineResourceNotFoundException("Unable to locate load balancer for $serverGroupName.")
     }
 
-    def updatedAutoscalingPolicy = new AutomaticScaling(
-      minIdleInstances: description.minIdleInstances ?: serverGroup.scalingPolicy?.minIdleInstances,
-      maxIdleInstances: description.maxIdleInstances ?: serverGroup.scalingPolicy?.maxIdleInstances)
-    def version = new Version(automaticScaling: updatedAutoscalingPolicy)
+    def updatedAutoscalingPolicy = AutomaticScaling.newBuilder()
+    if (description.minIdleInstances != null) {
+      updatedAutoscalingPolicy.setMinIdleInstances(description.minIdleInstances)
+    } else if (serverGroup.scalingPolicy?.minIdleInstances != null) {
+      updatedAutoscalingPolicy.setMinIdleInstances(serverGroup.scalingPolicy.minIdleInstances)
+    }
+    if (description.maxIdleInstances != null) {
+      updatedAutoscalingPolicy.setMaxIdleInstances(description.maxIdleInstances)
+    } else if (serverGroup.scalingPolicy?.maxIdleInstances != null) {
+      updatedAutoscalingPolicy.setMaxIdleInstances(serverGroup.scalingPolicy.maxIdleInstances)
+    }
+
+    def version = Version.newBuilder()
+        .setName("apps/${projectName}/services/${loadBalancerName}/versions/${serverGroupName}")
+        .setAutomaticScaling(updatedAutoscalingPolicy.build())
+        .build()
 
     task.updateStatus BASE_PHASE, "Setting min and max idle instance boundaries for $serverGroupName..."
     safeRetry.doRetry(
@@ -87,9 +102,20 @@ class UpsertAppengineAutoscalingPolicyAtomicOperation extends AppengineAtomicOpe
   }
 
   Operation callApi(String projectName, String loadBalancerName, String serverGroupName, Version version) {
-    return description.credentials.appengine.apps().services().versions()
-      .patch(projectName, loadBalancerName, serverGroupName, version)
-      .setUpdateMask("automaticScaling.min_idle_instances,automaticScaling.max_idle_instances")
-      .execute()
+    VersionsClient versionsClient = description.credentials.credentials.getVersionsClient()
+    try {
+      def updateMask = FieldMask.newBuilder()
+          .addPaths("automaticScaling.min_idle_instances")
+          .addPaths("automaticScaling.max_idle_instances")
+          .build()
+      def updateRequest = UpdateVersionRequest.newBuilder()
+          .setName("apps/${projectName}/services/${loadBalancerName}/versions/${serverGroupName}")
+          .setVersion(version)
+          .setUpdateMask(updateMask)
+          .build()
+      return versionsClient.updateVersionAsync(updateRequest).get()
+    } finally {
+      versionsClient.close()
+    }
   }
 }

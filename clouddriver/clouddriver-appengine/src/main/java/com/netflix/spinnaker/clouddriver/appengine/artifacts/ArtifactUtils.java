@@ -17,7 +17,9 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.artifacts;
 
+import com.google.cloud.ReadChannel;
 import java.io.*;
+import java.nio.channels.Channels;
 import java.util.Stack;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -69,6 +71,16 @@ public class ArtifactUtils {
       info.directory.setLastModified(info.millis);
     }
     tarStream.close();
+  }
+
+  public static void writeStreamToFile(ReadChannel sourceStream, File target) throws IOException {
+    File parent = target.getParentFile();
+    if (!parent.exists()) {
+      parent.mkdirs();
+    }
+    OutputStream targetStream = new FileOutputStream(target);
+    IOUtils.copy(Channels.newInputStream(sourceStream), targetStream);
+    targetStream.close();
   }
 
   public static void writeStreamToFile(InputStream sourceStream, File target) throws IOException {

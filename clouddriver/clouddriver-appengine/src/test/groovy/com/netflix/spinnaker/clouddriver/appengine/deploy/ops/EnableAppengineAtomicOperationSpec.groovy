@@ -16,9 +16,9 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy.ops
 
-import com.google.api.services.appengine.v1.Appengine
-import com.google.api.services.appengine.v1.model.Service
-import com.google.api.services.appengine.v1.model.TrafficSplit
+import com.google.appengine.v1.ApplicationsClient
+import com.google.appengine.v1.Service
+import com.google.appengine.v1.TrafficSplit
 import com.netflix.spectator.api.DefaultRegistry
 import com.netflix.spinnaker.clouddriver.appengine.deploy.AppengineSafeRetry
 import com.netflix.spinnaker.clouddriver.appengine.deploy.description.EnableDisableAppengineDescription

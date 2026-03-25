@@ -16,29 +16,22 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.model
 
-import com.google.api.services.appengine.v1.model.Version
+import com.google.appengine.v1.Version
 import com.google.common.annotations.VisibleForTesting
+import com.google.protobuf.Timestamp
 import com.netflix.spinnaker.clouddriver.appengine.deploy.description.UpsertAppengineLoadBalancerDescription
 import com.netflix.spinnaker.clouddriver.appengine.deploy.description.UpsertAppengineLoadBalancerDescription.AppengineTrafficSplitDescription
-
-import java.text.SimpleDateFormat
 
 class AppengineModelUtil {
   // https://cloud.google.com/appengine/docs/admin-api/reference/rest/v1/apps.services#TrafficSplit
   static final COOKIE_SPLIT_DECIMAL_PLACES = 3
   static final IP_SPLIT_DECIMAL_PLACES = 2
 
-  private static final dateFormats = ["yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'", "yyyy-MM-dd'T'HH:mm:ss'Z'"]
-    .collect { new SimpleDateFormat(it) }
-
-  static Long translateTime(String time) {
-    for (SimpleDateFormat dateFormat: dateFormats) {
-      try {
-        return dateFormat.parse(time).getTime()
-      } catch (e) { }
+  static Long translateTime(Timestamp timestamp) {
+    if (timestamp == null) {
+      return null
     }
-
-    null
+    return timestamp.getSeconds() * 1000L + timestamp.getNanos() / 1000000L
   }
 
   static AppengineScalingPolicy getScalingPolicy(Version version) {

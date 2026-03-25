@@ -16,9 +16,9 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.model
 
-import com.google.api.services.appengine.v1.model.Instance as AppengineApiInstance
-import com.google.api.services.appengine.v1.model.Service
-import com.google.api.services.appengine.v1.model.Version
+import com.google.appengine.v1.Instance as AppengineApiInstance
+import com.google.appengine.v1.Service
+import com.google.appengine.v1.Version
 import com.netflix.spinnaker.clouddriver.appengine.AppengineCloudProvider
 import com.netflix.spinnaker.clouddriver.model.HealthState
 import com.netflix.spinnaker.clouddriver.model.Instance
@@ -48,8 +48,8 @@ class AppengineInstance implements Instance, Serializable {
 
   AppengineInstance(AppengineApiInstance instance, Version version, Service service, String region) {
     this.health = [new AppengineHealth(version, service).toMap()]
-    this.instanceStatus = instance.getAvailability() ?
-      AppengineInstanceStatus.valueOf(instance.getAvailability()) :
+    this.instanceStatus = instance.getAvailability() != com.google.appengine.v1.Instance.Availability.UNRECOGNIZED ?
+      AppengineInstanceStatus.valueOf(instance.getAvailability().name()) :
       null
 
     /*
@@ -67,11 +67,11 @@ class AppengineInstance implements Instance, Serializable {
     this.zone = instance.getVmZoneName() ?: region
     this.requests = instance.getRequests()
     this.errors = instance.getErrors()
-    this.qps = instance.getQps()
+    this.qps = instance.getQps() as Float
     this.averageLatency = instance.getAverageLatency()
-    this.memoryUsage = instance.getMemoryUsage()
+    this.memoryUsage = "${instance.getMemoryUsage()}"
     this.vmStatus = instance.getVmStatus()
-    this.vmDebugEnabled = instance.getVmDebugEnabled()
+    this.vmDebugEnabled = "${instance.getVmDebugEnabled()}"
   }
 
   HealthState getHealthState() {

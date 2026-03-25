@@ -257,11 +257,10 @@ class AppengineNamedAccountCredentials extends AbstractAccountCredentials<Appeng
         new AppengineJsonCredentials(project, jsonKey) :
         new AppengineCredentials(project)
 
-      appengine = appengine ?: credentials.getAppengine(applicationName)
+      appengine = appengine ?: credentials.getApplicationsClient()
 
       if (liveLookupsEnabled) {
-        ApplicationsClient.create().getApplication(project).getLocationId();
-        region = appengine.apps().get(project).execute().getLocationId()
+        region = appengine.getApplication("apps/${project}").getLocationId()
       }
 
       gitCredentials = gitCredentials ?: new AppengineGitCredentials(

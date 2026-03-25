@@ -16,7 +16,7 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy.ops
 
-import com.google.api.services.appengine.v1.Appengine
+import com.google.appengine.v1.ApplicationsClient
 import com.netflix.spinnaker.clouddriver.appengine.deploy.description.DeleteAppengineLoadBalancerDescription
 import com.netflix.spinnaker.clouddriver.appengine.security.AppengineCredentials
 import com.netflix.spinnaker.clouddriver.appengine.security.AppengineNamedAccountCredentials

@@ -16,7 +16,7 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.model
 
-import com.google.api.services.appengine.v1.model.Application
+import com.google.appengine.v1.Application
 import groovy.transform.TupleConstructor
 
 class AppenginePlatformApplication {

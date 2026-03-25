@@ -16,6 +16,7 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy.ops
 
+import com.google.appengine.v1.ServicesClient
 import com.netflix.spinnaker.clouddriver.appengine.deploy.description.DeleteAppengineLoadBalancerDescription
 import com.netflix.spinnaker.clouddriver.data.task.Task
 import com.netflix.spinnaker.clouddriver.data.task.TaskRepository
@@ -43,11 +44,16 @@ class DeleteAppengineLoadBalancerAtomicOperation implements AtomicOperation<Void
     task.updateStatus BASE_PHASE, "Initializing deletion of load balancer $description.loadBalancerName..."
 
     def credentials = description.credentials
-    def appengine = credentials.appengine
     def project = credentials.project
     def loadBalancerName = description.loadBalancerName
 
-    appengine.apps().services().delete(project, loadBalancerName).execute()
+    ServicesClient servicesClient = credentials.credentials.getServicesClient()
+    try {
+      def serviceName = "apps/${project}/services/${loadBalancerName}"
+      servicesClient.deleteServiceAsync(serviceName).get()
+    } finally {
+      servicesClient.close()
+    }
 
     task.updateStatus BASE_PHASE, "Successfully deleted load balancer $loadBalancerName."
     return null

@@ -16,6 +16,7 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy.ops
 
+import com.google.appengine.v1.InstancesClient
 import com.netflix.spinnaker.clouddriver.appengine.deploy.description.TerminateAppengineInstancesDescription
 import com.netflix.spinnaker.clouddriver.appengine.model.AppengineInstance
 import com.netflix.spinnaker.clouddriver.appengine.provider.view.AppengineInstanceProvider
@@ -50,19 +51,22 @@ class TerminateAppengineInstancesAtomicOperation implements AtomicOperation<Void
       "${description.credentials.region}..."
 
     def credentials = description.credentials
-    def appengine = credentials.appengine
     def accountName = credentials.name
     def project = credentials.project
 
     def instanceIds = description.instanceIds
     def instances = instanceIds.collect { appengineInstanceProvider.getInstance(accountName, credentials.region, it) }
 
-    instances.each { AppengineInstance instance ->
-      def loadBalancerName = instance.loadBalancers[0]
-      def serverGroupName = instance.serverGroup
-
-      appengine
-        .apps().services().versions().instances().delete(project, loadBalancerName, serverGroupName, instance.id).execute()
+    InstancesClient instancesClient = credentials.credentials.getInstancesClient()
+    try {
+      instances.each { AppengineInstance instance ->
+        def loadBalancerName = instance.loadBalancers[0]
+        def serverGroupName = instance.serverGroup
+        def instanceName = "apps/${project}/services/${loadBalancerName}/versions/${serverGroupName}/instances/${instance.id}"
+        instancesClient.deleteInstanceAsync(instanceName).get()
+      }
+    } finally {
+      instancesClient.close()
     }
 
     task.updateStatus BASE_PHASE, "Successfully terminated provided instances."

@@ -16,12 +16,13 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.security;
 
-import com.google.api.services.appengine.v1.AppengineScopes;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.netflix.spinnaker.clouddriver.googlecommon.security.GoogleCommonCredentialUtils;
 
 public class AppengineJsonCredentials extends AppengineCredentials {
 
+  private static final String CLOUD_PLATFORM_SCOPE =
+      "https://www.googleapis.com/auth/cloud-platform";
   private final String jsonKey;
 
   public AppengineJsonCredentials(String project, String jsonKey) {
@@ -31,7 +32,7 @@ public class AppengineJsonCredentials extends AppengineCredentials {
 
   @Override
   public GoogleCredentials getCredentials() {
-    return GoogleCommonCredentialUtils.getCredentials(jsonKey, AppengineScopes.CLOUD_PLATFORM);
+    return GoogleCommonCredentialUtils.getCredentials(jsonKey, CLOUD_PLATFORM_SCOPE);
   }
 
   public final String getJsonKey() {

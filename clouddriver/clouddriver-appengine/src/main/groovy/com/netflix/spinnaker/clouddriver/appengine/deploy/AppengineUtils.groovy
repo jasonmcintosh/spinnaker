@@ -16,13 +16,12 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy
 
-import com.google.appengine.v1.ListVersionsResponse
+import com.google.appengine.v1.ListServicesRequest
+import com.google.appengine.v1.ListVersionsRequest
 import com.google.appengine.v1.Service
 import com.google.appengine.v1.ServicesClient
-import com.google.appengine.v1.ServicesSettings
 import com.google.appengine.v1.Version
-import com.google.monitoring.v3.ListServicesRequest
-import com.netflix.spinnaker.clouddriver.appengine.provider.callbacks.AppengineCallback
+import com.google.appengine.v1.VersionsClient
 import com.netflix.spinnaker.clouddriver.appengine.security.AppengineNamedAccountCredentials
 import com.netflix.spinnaker.clouddriver.data.task.Task
 
@@ -34,24 +33,23 @@ class AppengineUtils {
     task.updateStatus phase, "Querying all versions for project $project..."
     def services = queryAllServices(project, credentials, task, phase)
 
-    // TODO(jacobkiefer): Consider limiting batch sizes.
-    // https://github.com/spinnaker/spinnaker/issues/3564.
     def allVersions = []
-
-    services.each { service ->
-      def callback = new AppengineCallback<ListVersionsResponse>()
-        .success { ListVersionsResponse versionsResponse, HttpHeaders responseHeaders ->
-          def versions = versionsResponse.getVersionsList()
-          if (versions) {
-            allVersions << versions
-          }
+    VersionsClient versionsClient = credentials.credentials.getVersionsClient()
+    try {
+      services.each { service ->
+        def listVersionsRequest = ListVersionsRequest.newBuilder()
+            .setParent("apps/${project}/services/${service.getId()}")
+            .build()
+        def versions = versionsClient.listVersions(listVersionsRequest).iterateAll().toList()
+        if (versions) {
+          allVersions.addAll(versions)
         }
-
-      credentials.appengine.getAapps().services().versions().list(project, service.getId()).queue(batch, callback)
+      }
+    } finally {
+      versionsClient.close()
     }
 
-
-    return allVersions.flatten()
+    return allVersions
   }
 
   static List<Service> queryAllServices(String project,
@@ -59,8 +57,15 @@ class AppengineUtils {
                                         Task task,
                                         String phase) {
     task.updateStatus phase, "Querying services for project $project..."
-    services = ServicesClient.create(ServicesSettings.create()).listServicesCallable().call(ListServicesRequest.newBuilder()).getServicesList();
-    return credentials.appengine.apps().services().list(project).execute().getServices()
+    ServicesClient servicesClient = credentials.credentials.getServicesClient()
+    try {
+      def listServicesRequest = ListServicesRequest.newBuilder()
+          .setParent("apps/${project}")
+          .build()
+      return servicesClient.listServices(listServicesRequest).iterateAll().toList()
+    } finally {
+      servicesClient.close()
+    }
   }
 
   static List<Version> queryVersionsForService(String project,
@@ -69,7 +74,15 @@ class AppengineUtils {
                                                Task task,
                                                String phase) {
     task.updateStatus phase, "Querying versions for project $project and service $service"
-    return credentials.appengine.apps().services().versions().list(project, service).execute().getVersions()
+    VersionsClient versionsClient = credentials.credentials.getVersionsClient()
+    try {
+      def listVersionsRequest = ListVersionsRequest.newBuilder()
+          .setParent("apps/${project}/services/${service}")
+          .build()
+      return versionsClient.listVersions(listVersionsRequest).iterateAll().toList()
+    } finally {
+      versionsClient.close()
+    }
   }
 
   static Service queryService(String project,
@@ -78,6 +91,12 @@ class AppengineUtils {
                               Task task,
                               String phase) {
     task.updateStatus phase, "Querying service $service for project $project..."
-    return credentials.appengine.apps().services().get(project, service).execute()
+    ServicesClient servicesClient = credentials.credentials.getServicesClient()
+    try {
+      def serviceName = "apps/${project}/services/${service}"
+      return servicesClient.getService(serviceName)
+    } finally {
+      servicesClient.close()
+    }
   }
 }

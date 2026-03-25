@@ -18,7 +18,7 @@ package com.netflix.spinnaker.clouddriver.appengine.model
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.google.api.services.appengine.v1.model.Service
+import com.google.appengine.v1.Service
 import com.netflix.spinnaker.clouddriver.appengine.AppengineCloudProvider
 import com.netflix.spinnaker.clouddriver.model.LoadBalancer
 import com.netflix.spinnaker.clouddriver.model.LoadBalancerInstance

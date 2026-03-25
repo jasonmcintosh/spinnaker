@@ -16,16 +16,16 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.artifacts;
 
-import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.ReadChannel;
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.security.GeneralSecurityException;
 import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -35,45 +35,15 @@ import org.slf4j.LoggerFactory;
 public class GcsStorageService {
   private static final Logger log = LoggerFactory.getLogger(GcsStorageService.class);
 
-  public static interface VisitorOperation {
-    void visit(StorageObject storageObj) throws IOException;
-  }
-
   public static class Factory {
-    private String applicationName_;
-    private HttpTransport transport_;
-    private JsonFactory jsonFactory_;
-
-    public Factory(String applicationName) throws IOException, GeneralSecurityException {
-      applicationName_ = applicationName;
-      transport_ = GoogleNetHttpTransport.newTrustedTransport();
-      jsonFactory_ = GsonFactory.getDefaultInstance();
-    }
-
-    public Factory(String applicationName, HttpTransport transport, JsonFactory jsonFactory) {
-      applicationName_ = applicationName;
-      transport_ = transport;
-      jsonFactory_ = jsonFactory;
-    }
-
     public GcsStorageService newForCredentials(String credentialsPath) throws IOException {
-      GoogleCredentials credentials = loadCredentials(credentialsPath);
-      HttpRequestInitializer requestInitializer = new HttpCredentialsAdapter(credentials);
-      Storage storage =
-          new Storage.Builder(transport_, jsonFactory_, requestInitializer)
-              .setApplicationName(applicationName_)
-              .build();
-
-      return new GcsStorageService(storage);
-    }
-
-    private GoogleCredentials loadCredentials(String credentialsPath) throws IOException {
       GoogleCredentials credentials;
       if (credentialsPath != null && !credentialsPath.isEmpty()) {
         FileInputStream stream = new FileInputStream(credentialsPath);
         credentials =
             GoogleCredentials.fromStream(stream)
-                .createScoped(Collections.singleton(StorageScopes.DEVSTORAGE_READ_ONLY));
+                .createScoped(
+                    Collections.singleton("https://www.googleapis.com/auth/devstorage.read_only"));
         log.info("Loaded credentials from " + credentialsPath);
       } else {
         log.info(
@@ -81,30 +51,35 @@ public class GcsStorageService {
                 + "Using default application credentials. Using default credentials.");
         credentials = GoogleCredentials.getApplicationDefault();
       }
-      return credentials;
+      return new GcsStorageService(
+          StorageOptions.newBuilder().setCredentials(credentials).build().getService());
     }
   }
 
-  private Storage storage_;
+  private Storage storage;
 
   public GcsStorageService(Storage storage) {
-    storage_ = storage;
+    this.storage = storage;
   }
 
-  public InputStream openObjectStream(String bucketName, String path, Long generation)
-      throws IOException {
-    Storage.Objects.Get get = storage_.objects().get(bucketName, path);
+  public ReadChannel openObjectStream(String bucketName, String path, Long generation) {
+    Blob blob = null;
     if (generation != null) {
-      get.setGeneration(generation);
+      storage.get(bucketName).get(path, Storage.BlobGetOption.generationMatch(generation));
+    } else {
+      blob = storage.get(bucketName).get(path);
     }
-    return get.executeMediaAsInputStream();
+    return blob.reader(Blob.BlobSourceOption.metagenerationMatch());
   }
 
-  public void visitObjects(String bucketName, String pathPrefix, VisitorOperation op)
-      throws IOException {
-    Storage.Objects.List listMethod = storage_.objects().list(bucketName);
-    listMethod.setPrefix(pathPrefix);
-    Objects objects;
+  public interface VisitorOperation {
+    void visit(Blob storageObj) throws IOException;
+  }
+
+  public void visitObjects(String bucketName, String pathPrefix, VisitorOperation visitor) {
+
+    Iterable<Blob> objects =
+        storage.get(bucketName).list(Storage.BlobListOption.matchGlob(pathPrefix)).iterateAll();
     ExecutorService executor =
         Executors.newFixedThreadPool(
             8,
@@ -112,23 +87,16 @@ public class GcsStorageService {
                 .setNameFormat(GcsStorageService.class.getSimpleName() + "-%d")
                 .build());
 
-    do {
-      objects = listMethod.execute();
-      List<StorageObject> items = objects.getItems();
-      if (items != null) {
-        for (StorageObject obj : items) {
-          executor.submit(
-              () -> {
-                try {
-                  op.visit(obj);
-                } catch (IOException ioex) {
-                  throw new IllegalStateException(ioex);
-                }
-              });
-        }
-      }
-      listMethod.setPageToken(objects.getNextPageToken());
-    } while (objects.getNextPageToken() != null);
+    for (Blob obj : objects) {
+      executor.submit(
+          () -> {
+            try {
+              visitor.visit(obj);
+            } catch (IOException ioex) {
+              throw new IllegalStateException(ioex);
+            }
+          });
+    }
     executor.shutdown();
 
     try {
@@ -140,8 +108,8 @@ public class GcsStorageService {
     }
   }
 
-  public void downloadStorageObjectRelative(
-      StorageObject obj, String ignorePrefix, String baseDirectory) throws IOException {
+  public void downloadStorageObjectRelative(Blob obj, String ignorePrefix, String baseDirectory)
+      throws IOException {
     String objPath = obj.getName();
     if (!ignorePrefix.isEmpty()) {
       ignorePrefix += File.separator;
@@ -156,14 +124,14 @@ public class GcsStorageService {
       return;
     }
     File target = new File(baseDirectory, objPath);
-    try (InputStream stream =
+    try (ReadChannel stream =
         openObjectStream(obj.getBucket(), obj.getName(), obj.getGeneration())) {
       ArtifactUtils.writeStreamToFile(stream, target);
     }
-    target.setLastModified(obj.getUpdated().getValue());
+    target.setLastModified(obj.getUpdateTimeOffsetDateTime().toEpochSecond());
   }
 
-  public void downloadStorageObject(StorageObject obj, String baseDirectory) throws IOException {
+  public void downloadStorageObject(Blob obj, String baseDirectory) throws IOException {
     downloadStorageObjectRelative(obj, "", baseDirectory);
   }
 }

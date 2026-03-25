@@ -16,8 +16,11 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy.ops
 
-import com.google.api.services.appengine.v1.model.Operation
-import com.google.api.services.appengine.v1.model.Version
+import com.google.appengine.v1.UpdateVersionRequest
+import com.google.appengine.v1.Version
+import com.google.appengine.v1.VersionsClient
+import com.google.longrunning.Operation
+import com.google.protobuf.FieldMask
 import com.netflix.spinnaker.clouddriver.appengine.deploy.AppengineSafeRetry
 import com.netflix.spinnaker.clouddriver.appengine.deploy.description.StartStopAppengineDescription
 import com.netflix.spinnaker.clouddriver.appengine.model.AppengineServerGroup
@@ -65,8 +68,13 @@ abstract class AbstractStartStopAppengineAtomicOperation extends AppengineAtomic
     def serverGroup = appengineClusterProvider.getServerGroup(credentials.name, credentials.region, serverGroupName)
     def loadBalancerName = serverGroup.loadBalancers.first()
 
-    def newServingStatus = start ? AppengineServerGroup.ServingStatus.SERVING : AppengineServerGroup.ServingStatus.STOPPED
-    def version = new Version(servingStatus: newServingStatus.toString())
+    def newServingStatus = start ?
+        Version.ServingStatus.SERVING :
+        Version.ServingStatus.STOPPED
+    def version = Version.newBuilder()
+        .setName("apps/${project}/services/${loadBalancerName}/versions/${serverGroupName}")
+        .setServingStatus(newServingStatus)
+        .build()
 
     task.updateStatus basePhase, "$presentParticipling $serverGroupName..."
 
@@ -84,9 +92,17 @@ abstract class AbstractStartStopAppengineAtomicOperation extends AppengineAtomic
   }
 
   Operation callApi(String project, String loadBalancerName, String serverGroupName, Version version) {
-    description.credentials.appengine.apps().services().versions()
-        .patch(project, loadBalancerName, serverGroupName, version)
-        .setUpdateMask("servingStatus")
-        .execute()
+    VersionsClient versionsClient = description.credentials.credentials.getVersionsClient()
+    try {
+      def updateMask = FieldMask.newBuilder().addPaths("servingStatus").build()
+      def updateRequest = UpdateVersionRequest.newBuilder()
+          .setName("apps/${project}/services/${loadBalancerName}/versions/${serverGroupName}")
+          .setVersion(version)
+          .setUpdateMask(updateMask)
+          .build()
+      return versionsClient.updateVersionAsync(updateRequest).get()
+    } finally {
+      versionsClient.close()
+    }
   }
 }

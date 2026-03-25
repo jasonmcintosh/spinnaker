@@ -17,9 +17,10 @@
 package com.netflix.spinnaker.clouddriver.appengine.model
 
 import com.fasterxml.jackson.annotation.JsonInclude
-import com.google.api.services.appengine.v1.model.AutomaticScaling
-import com.google.api.services.appengine.v1.model.BasicScaling
-import com.google.api.services.appengine.v1.model.ManualScaling
+import com.google.appengine.v1.AutomaticScaling
+import com.google.appengine.v1.BasicScaling
+import com.google.appengine.v1.ManualScaling
+import com.google.protobuf.Duration
 import groovy.transform.TupleConstructor
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -51,21 +52,33 @@ class AppengineScalingPolicy implements Serializable {
     type = ScalingPolicyType.AUTOMATIC
   }
 
+  private static String durationToString(Duration duration) {
+    if (duration == null) {
+      return null
+    }
+    long seconds = duration.getSeconds()
+    int nanos = duration.getNanos()
+    if (nanos == 0) {
+      return "${seconds}s"
+    }
+    return String.format("%d.%09ds", seconds, nanos)
+  }
+
   AppengineScalingPolicy(AutomaticScaling automaticScaling) {
     type = ScalingPolicyType.AUTOMATIC
 
     automaticScaling?.with {
-      this.coolDownPeriod = getCoolDownPeriod()
+      this.coolDownPeriod = durationToString(getCoolDownPeriod())
       this.maxConcurrentRequests = getMaxConcurrentRequests()
       this.maxIdleInstances = getMaxIdleInstances()
-      this.maxPendingLatency = getMaxPendingLatency()
+      this.maxPendingLatency = durationToString(getMaxPendingLatency())
       this.maxTotalInstances = getMaxTotalInstances()
       this.minIdleInstances = getMinIdleInstances()
-      this.minPendingLatency = getMinPendingLatency()
+      this.minPendingLatency = durationToString(getMinPendingLatency())
       this.minTotalInstances = getMinTotalInstances()
 
       getCpuUtilization()?.with {
-        this.cpuUtilization = new CpuUtilization(getAggregationWindowLength(),
+        this.cpuUtilization = new CpuUtilization(durationToString(getAggregationWindowLength()),
                                                  getTargetUtilization())
       }
 
@@ -92,7 +105,7 @@ class AppengineScalingPolicy implements Serializable {
 
   AppengineScalingPolicy(BasicScaling basicScaling) {
     type = ScalingPolicyType.BASIC
-    idleTimeout = basicScaling.getIdleTimeout()
+    idleTimeout = durationToString(basicScaling.getIdleTimeout())
     maxInstances = basicScaling.getMaxInstances()
   }
 

@@ -16,6 +16,7 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy.ops
 
+import com.google.appengine.v1.VersionsClient
 import com.netflix.spinnaker.clouddriver.appengine.deploy.AppengineSafeRetry
 import com.netflix.spinnaker.clouddriver.appengine.deploy.description.DestroyAppengineDescription
 import com.netflix.spinnaker.clouddriver.appengine.deploy.exception.AppengineResourceNotFoundException
@@ -52,7 +53,6 @@ class DestroyAppengineAtomicOperation extends AppengineAtomicOperation<Void> {
     task.updateStatus BASE_PHASE, "Initializing destruction of server group $description.serverGroupName..."
 
     def credentials = description.credentials
-    def appengine = credentials.appengine
     def project = credentials.project
     def serverGroupName = description.serverGroupName
 
@@ -68,7 +68,13 @@ class DestroyAppengineAtomicOperation extends AppengineAtomicOperation<Void> {
 
     safeRetry.doRetry(
       {
-        appengine.apps().services().versions().delete(project, loadBalancerName, serverGroupName).execute()
+        VersionsClient versionsClient = credentials.credentials.getVersionsClient()
+        try {
+          def versionName = "apps/${project}/services/${loadBalancerName}/versions/${serverGroupName}"
+          versionsClient.deleteVersionAsync(versionName).get()
+        } finally {
+          versionsClient.close()
+        }
       },
       "version",
       task,

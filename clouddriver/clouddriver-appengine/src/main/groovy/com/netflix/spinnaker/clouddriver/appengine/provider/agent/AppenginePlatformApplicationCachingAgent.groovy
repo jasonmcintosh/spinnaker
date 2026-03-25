@@ -17,7 +17,8 @@
 package com.netflix.spinnaker.clouddriver.appengine.provider.agent
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.google.api.services.appengine.v1.model.Application
+import com.google.appengine.v1.Application
+import com.google.appengine.v1.ApplicationsClient
 import com.netflix.spinnaker.cats.agent.AgentDataType
 import com.netflix.spinnaker.cats.agent.CacheResult
 import com.netflix.spinnaker.cats.agent.DefaultCacheResult
@@ -57,13 +58,24 @@ class AppenginePlatformApplicationCachingAgent extends AbstractAppengineCachingA
   @Override
   CacheResult loadData(ProviderCache providerCache) {
     def platformApplicationName = credentials.project
-    Application platformApplication = credentials.appengine.apps().get(platformApplicationName).execute()
     Map<String, MutableCacheData> cachedPlatformApplications = MutableCacheData.mutableCacheMap()
-    def apiApplicationKey = Keys.getPlatformApplicationKey(platformApplicationName)
 
-    cachedPlatformApplications[apiApplicationKey].with {
-      attributes.name = platformApplicationName
-      attributes.platformApplication = new AppenginePlatformApplication(platformApplication)
+    try {
+      ApplicationsClient applicationsClient = credentials.credentials.getApplicationsClient()
+      try {
+        def appName = "apps/${platformApplicationName}"
+        Application platformApplication = applicationsClient.getApplication(appName)
+        def apiApplicationKey = Keys.getPlatformApplicationKey(platformApplicationName)
+
+        cachedPlatformApplications[apiApplicationKey].with {
+          attributes.name = platformApplicationName
+          attributes.platformApplication = new AppenginePlatformApplication(platformApplication)
+        }
+      } finally {
+        applicationsClient.close()
+      }
+    } catch (Exception e) {
+      log.error("Error loading platform application", e)
     }
 
     log.info("Caching ${cachedPlatformApplications.size()} platform applications in ${agentType}")

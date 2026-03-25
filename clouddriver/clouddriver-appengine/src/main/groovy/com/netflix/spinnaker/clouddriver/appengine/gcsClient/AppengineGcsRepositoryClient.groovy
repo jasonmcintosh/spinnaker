@@ -16,6 +16,7 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.gcsClient
 
+import com.google.cloud.ReadChannel
 import com.netflix.spinnaker.clouddriver.appengine.AppengineJobExecutor
 import com.netflix.spinnaker.clouddriver.appengine.artifacts.GcsStorageService
 import com.netflix.spinnaker.clouddriver.appengine.model.AppengineRepositoryClient
@@ -25,6 +26,8 @@ import groovy.transform.TupleConstructor
 import groovy.util.logging.Slf4j
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.IOUtils
+
+import java.nio.channels.Channels
 
 @CompileStatic
 @Slf4j
@@ -80,14 +83,13 @@ class AppengineGcsRepositoryClient implements AppengineRepositoryClient {
     }
 
     if (bucketPath.endsWith(".tar")) {
-      InputStream tas = storage.openObjectStream(bucketName, bucketPath, version)
-
+      File tempFile = File.createTempFile("app", "tar")
+      FileOutputStream fos = new FileOutputStream(tempFile)
+      ReadChannel tas = storage.openObjectStream(bucketName, bucketPath, version)
       // NOTE: We write the tar file out to an intermediate temp file because the tar input stream
       // directly from openObjectStream() closes unexpectedly when accessed from untarStreamToPath()
       // for some reason.
-      File tempFile = File.createTempFile("app", "tar")
-      FileOutputStream fos = new FileOutputStream(tempFile)
-      IOUtils.copy(tas, fos)
+      IOUtils.copy(Channels.newInputStream(tas), fos)
       tas.close()
       fos.close()
 

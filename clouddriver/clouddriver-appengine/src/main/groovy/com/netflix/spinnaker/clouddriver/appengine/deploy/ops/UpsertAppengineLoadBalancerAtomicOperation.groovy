@@ -16,9 +16,12 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy.ops
 
-import com.google.api.services.appengine.v1.model.Operation
-import com.google.api.services.appengine.v1.model.Service
-import com.google.api.services.appengine.v1.model.TrafficSplit
+import com.google.appengine.v1.Service
+import com.google.appengine.v1.ServicesClient
+import com.google.appengine.v1.TrafficSplit
+import com.google.appengine.v1.UpdateServiceRequest
+import com.google.longrunning.Operation
+import com.google.protobuf.FieldMask
 import com.netflix.spinnaker.clouddriver.appengine.deploy.AppengineSafeRetry
 import com.netflix.spinnaker.clouddriver.appengine.deploy.description.UpsertAppengineLoadBalancerDescription
 import com.netflix.spinnaker.clouddriver.appengine.model.AppengineTrafficSplit
@@ -70,12 +73,16 @@ class UpsertAppengineLoadBalancerAtomicOperation extends AppengineAtomicOperatio
     def ancestorLoadBalancer = appengineLoadBalancerProvider.getLoadBalancer(credentials.name, loadBalancerName)
     def override = copyAndOverrideAncestorSplit(ancestorLoadBalancer.split, updateSplit)
 
-    def service = new Service(
-      split: new TrafficSplit(
-        allocations: override.allocations,
-        shardBy: override.shardBy ? override.shardBy.toString() : null
-      )
-    )
+    def trafficSplit = TrafficSplit.newBuilder()
+        .putAllAllocations(override.allocations)
+    if (override.shardBy) {
+      trafficSplit.setShardByValue(override.shardBy.ordinal())
+    }
+
+    def service = Service.newBuilder()
+        .setName("apps/${credentials.project}/services/${loadBalancerName}")
+        .setSplit(trafficSplit.build())
+        .build()
 
     def callApiClosure = { callApi(credentials.project, loadBalancerName, service) }
     if (retryApiCall) {
@@ -96,10 +103,19 @@ class UpsertAppengineLoadBalancerAtomicOperation extends AppengineAtomicOperatio
   }
 
   Operation callApi(String projectName, String loadBalancerName, Service updatedService) {
-    return description.credentials.appengine.apps().services().patch(projectName, loadBalancerName, updatedService)
-      .setUpdateMask("split")
-      .setMigrateTraffic(description.migrateTraffic)
-      .execute()
+    ServicesClient servicesClient = description.credentials.credentials.getServicesClient()
+    try {
+      def updateMask = FieldMask.newBuilder().addPaths("split").build()
+      def updateRequest = UpdateServiceRequest.newBuilder()
+          .setName("apps/${projectName}/services/${loadBalancerName}")
+          .setService(updatedService)
+          .setUpdateMask(updateMask)
+          .setMigrateTraffic(description.migrateTraffic)
+          .build()
+      return servicesClient.updateServiceAsync(updateRequest).get()
+    } finally {
+      servicesClient.close()
+    }
   }
 
   static AppengineTrafficSplit copyAndOverrideAncestorSplit(AppengineTrafficSplit ancestor, AppengineTrafficSplit update) {

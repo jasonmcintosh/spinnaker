@@ -18,8 +18,8 @@ package com.netflix.spinnaker.clouddriver.appengine.model
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.google.api.services.appengine.v1.model.Service
-import com.google.api.services.appengine.v1.model.Version
+import com.google.appengine.v1.Service
+import com.google.appengine.v1.Version
 import com.netflix.spinnaker.clouddriver.model.Health
 import com.netflix.spinnaker.clouddriver.model.HealthState
 

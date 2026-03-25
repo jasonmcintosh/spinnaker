@@ -18,10 +18,15 @@ package com.netflix.spinnaker.clouddriver.appengine.provider.agent
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.google.api.client.googleapis.batch.BatchRequest
-import com.google.api.client.googleapis.json.GoogleJsonError
-import com.google.api.client.http.HttpHeaders
-import com.google.api.services.appengine.v1.model.*
+import com.google.api.gax.rpc.NotFoundException as GaxNotFoundException
+import com.google.appengine.v1.Instance
+import com.google.appengine.v1.InstancesClient
+import com.google.appengine.v1.ListServicesRequest
+import com.google.appengine.v1.ListVersionsRequest
+import com.google.appengine.v1.Service
+import com.google.appengine.v1.ServicesClient
+import com.google.appengine.v1.Version
+import com.google.appengine.v1.VersionsClient
 import com.netflix.frigga.Names
 import com.netflix.spectator.api.Registry
 import com.netflix.spinnaker.cats.agent.AgentDataType
@@ -315,30 +320,45 @@ class AppengineServerGroupCachingAgent extends AbstractAppengineCachingAgent imp
 
   Map<Service, List<Version>> loadServerGroups() {
     def project = credentials.project
-    def loadBalancers = credentials.appengine.apps().services().list(project).execute().getServices() ?: []
-    BatchRequest batch = credentials.appengine.batch() // TODO(jacobkiefer): Consider limiting batch sizes. https://github.com/spinnaker/spinnaker/issues/3564.
     Map<Service, List<Version>> serverGroupsByLoadBalancer = [:].withDefault { [] }
 
-    loadBalancers.each { loadBalancer ->
-      def loadBalancerName = loadBalancer.getId()
-      if (shouldIgnoreLoadBalancer(loadBalancerName)) {
-        return
-      }
-      def callback = new AppengineCallback<ListVersionsResponse>()
-        .success { ListVersionsResponse versionsResponse, HttpHeaders responseHeaders ->
-          def versions = versionsResponse.getVersions()
+    try {
+      ServicesClient servicesClient = credentials.credentials.getServicesClient()
+      VersionsClient versionsClient = credentials.credentials.getVersionsClient()
+
+      try {
+        def listServicesRequest = ListServicesRequest.newBuilder()
+            .setParent("apps/${project}")
+            .build()
+
+        def loadBalancers = servicesClient.listServices(listServicesRequest).iterateAll()
+
+        loadBalancers.each { loadBalancer ->
+          def loadBalancerName = loadBalancer.getId()
+          if (shouldIgnoreLoadBalancer(loadBalancerName)) {
+            return
+          }
+
+          def listVersionsRequest = ListVersionsRequest.newBuilder()
+              .setParent("apps/${project}/services/${loadBalancerName}")
+              .build()
+
+          def versions = versionsClient.listVersions(listVersionsRequest).iterateAll().toList()
           if (versions) {
             versions.removeIf { shouldIgnoreServerGroup(it.getId()) }
-            if(versions) {
+            if (versions) {
               serverGroupsByLoadBalancer[loadBalancer].addAll(versions)
             }
           }
         }
-
-      credentials.appengine.apps().services().versions().list(project, loadBalancerName).queue(batch, callback)
+      } finally {
+        servicesClient.close()
+        versionsClient.close()
+      }
+    } catch (Exception e) {
+      log.error("Error loading server groups", e)
     }
 
-    executeIfRequestsAreQueued(batch)
     return serverGroupsByLoadBalancer
   }
 
@@ -347,70 +367,77 @@ class AppengineServerGroupCachingAgent extends AbstractAppengineCachingAgent imp
       return [:]
     }
     def project = credentials.project
-    def loadBalancers = credentials.appengine.apps().services().list(project).execute().getServices() ?: []
-    BatchRequest batch = credentials.appengine.batch()
-    Service loadBalancer
-    Version serverGroup
+    Service loadBalancer = null
+    Version serverGroup = null
 
-    loadBalancers.removeIf { shouldIgnoreLoadBalancer(it.getName()) }
+    try {
+      ServicesClient servicesClient = credentials.credentials.getServicesClient()
+      VersionsClient versionsClient = credentials.credentials.getVersionsClient()
 
-    // We don't know where our server group is, so we have to check all of the load balancers.
-    loadBalancers.each { Service lb ->
-      def loadBalancerName = lb.getId()
-      def callback = new AppengineCallback<Version>()
-        .success { Version version, HttpHeaders responseHeaders ->
-          if (version) {
-            serverGroup = version
-            loadBalancer = lb
+      try {
+        def listServicesRequest = ListServicesRequest.newBuilder()
+            .setParent("apps/${project}")
+            .build()
+
+        def loadBalancers = servicesClient.listServices(listServicesRequest).iterateAll().toList()
+        loadBalancers.removeIf { shouldIgnoreLoadBalancer(it.getName()) }
+
+        // We don't know where our server group is, so we have to check all of the load balancers.
+        for (Service lb : loadBalancers) {
+          def loadBalancerName = lb.getId()
+          try {
+            def versionName = "apps/${project}/services/${loadBalancerName}/versions/${serverGroupName}"
+            def version = versionsClient.getVersion(versionName)
+            if (version) {
+              serverGroup = version
+              loadBalancer = lb
+              break
+            }
+          } catch (GaxNotFoundException e) {
+            // Version not in this service, continue searching
+          } catch (Exception e) {
+            log.error("Error fetching version ${serverGroupName} from service ${loadBalancerName}", e)
           }
         }
-        .failure { GoogleJsonError e, HttpHeaders responseHeaders ->
-          if (e.code != 404) {
-            def errorJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(e)
-            log.error errorJson
-          }
-        }
-
-        credentials
-          .appengine
-          .apps()
-          .services()
-          .versions()
-          .get(credentials.project, loadBalancerName, serverGroupName)
-          .queue(batch, callback)
+      } finally {
+        servicesClient.close()
+        versionsClient.close()
+      }
+    } catch (Exception e) {
+      log.error("Error loading server group and load balancer", e)
     }
 
-    executeIfRequestsAreQueued(batch)
     return [serverGroup: serverGroup, loadBalancer: loadBalancer]
   }
 
   Map<Version, List<Instance>> loadInstances(Map<Service, List<Version>> serverGroupsByLoadBalancer) {
-    BatchRequest batch = credentials.appengine.batch()
     Map<Version, List<Instance>> instancesByServerGroup = [:].withDefault { [] }
 
-    serverGroupsByLoadBalancer.each { Service loadBalancer, List<Version> serverGroups ->
-      serverGroups.each { Version serverGroup ->
-        def serverGroupName = serverGroup.getId()
-        def callback = new AppengineCallback<ListInstancesResponse>()
-          .success { ListInstancesResponse instancesResponse, HttpHeaders httpHeaders ->
-            def instances = instancesResponse.getInstances()
-            if (instances) {
-              instancesByServerGroup[serverGroup].addAll(instances)
+    try {
+      InstancesClient instancesClient = credentials.credentials.getInstancesClient()
+
+      try {
+        serverGroupsByLoadBalancer.each { Service loadBalancer, List<Version> serverGroups ->
+          serverGroups.each { Version serverGroup ->
+            def serverGroupName = serverGroup.getId()
+            try {
+              def parent = "apps/${credentials.project}/services/${loadBalancer.getId()}/versions/${serverGroupName}"
+              def instances = instancesClient.listInstances(parent).iterateAll().toList()
+              if (instances) {
+                instancesByServerGroup[serverGroup].addAll(instances)
+              }
+            } catch (Exception e) {
+              log.error("Error fetching instances for ${serverGroupName}", e)
             }
           }
-
-        credentials
-          .appengine
-          .apps()
-          .services()
-          .versions()
-          .instances()
-          .list(credentials.project, loadBalancer.getId(), serverGroupName)
-          .queue(batch, callback)
+        }
+      } finally {
+        instancesClient.close()
       }
+    } catch (Exception e) {
+      log.error("Error loading instances", e)
     }
 
-    executeIfRequestsAreQueued(batch)
     return instancesByServerGroup
   }
 

@@ -16,14 +16,18 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.security;
 
-import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.services.appengine.v1.Appengine;
-import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.api.gax.core.FixedCredentialsProvider;
+import com.google.appengine.v1.ApplicationsClient;
+import com.google.appengine.v1.ApplicationsSettings;
+import com.google.appengine.v1.InstancesClient;
+import com.google.appengine.v1.InstancesSettings;
+import com.google.appengine.v1.ServicesClient;
+import com.google.appengine.v1.ServicesSettings;
+import com.google.appengine.v1.VersionsClient;
+import com.google.appengine.v1.VersionsSettings;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.netflix.spinnaker.clouddriver.googlecommon.security.GoogleCommonCredentials;
+import java.io.IOException;
 
 public class AppengineCredentials extends GoogleCommonCredentials {
 
@@ -33,13 +37,39 @@ public class AppengineCredentials extends GoogleCommonCredentials {
     this.project = project;
   }
 
-  public Appengine getAppengine(String applicationName) {
-    HttpTransport httpTransport = buildHttpTransport();
-    JsonFactory jsonFactory = GsonFactory.getDefaultInstance();
+  public ServicesClient getServicesClient() throws IOException {
     GoogleCredentials credentials = getCredentials();
-    HttpRequestInitializer requestInitializer = new HttpCredentialsAdapter(credentials);
-    return new Appengine.Builder(httpTransport, jsonFactory, requestInitializer)
-        .setApplicationName(applicationName)
-        .build();
+    ServicesSettings settings =
+        ServicesSettings.newBuilder()
+            .setCredentialsProvider(FixedCredentialsProvider.create(credentials))
+            .build();
+    return ServicesClient.create(settings);
+  }
+
+  public VersionsClient getVersionsClient() throws IOException {
+    GoogleCredentials credentials = getCredentials();
+    VersionsSettings settings =
+        VersionsSettings.newBuilder()
+            .setCredentialsProvider(FixedCredentialsProvider.create(credentials))
+            .build();
+    return VersionsClient.create(settings);
+  }
+
+  public InstancesClient getInstancesClient() throws IOException {
+    GoogleCredentials credentials = getCredentials();
+    InstancesSettings settings =
+        InstancesSettings.newBuilder()
+            .setCredentialsProvider(FixedCredentialsProvider.create(credentials))
+            .build();
+    return InstancesClient.create(settings);
+  }
+
+  public ApplicationsClient getApplicationsClient() throws IOException {
+    GoogleCredentials credentials = getCredentials();
+    ApplicationsSettings settings =
+        ApplicationsSettings.newBuilder()
+            .setCredentialsProvider(FixedCredentialsProvider.create(credentials))
+            .build();
+    return ApplicationsClient.create(settings);
   }
 }
