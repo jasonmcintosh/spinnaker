@@ -3,7 +3,7 @@ dependencies {
   annotationProcessor 'org.projectlombok:lombok'
 
   // TODO(plumpy): remove version once added to kork
-  implementation "com.google.cloud:google-cloud-storage:1.108.0"
+  implementation "com.google.cloud:google-cloud-storage"
   implementation "io.spinnaker.clouddriver:clouddriver-api"
   implementation "io.spinnaker.clouddriver:clouddriver-docker"
   implementation "io.spinnaker.clouddriver:clouddriver-google"
@@ -25,9 +25,9 @@ dependencies {
   implementation "io.spinnaker.kork:kork-cloud-config-server"
   implementation "software.amazon.awssdk:auth"
   implementation "software.amazon.awssdk:s3"
-  implementation 'com.google.apis:google-api-services-compute'
-  implementation 'com.google.apis:google-api-services-appengine:v1-rev92-1.25.0'
-  implementation 'com.google.apis:google-api-services-run:v2-rev20220429-1.32.1'
+  implementation 'com.google.cloud:google-cloud-compute'
+  implementation 'com.google.cloud:google-cloud-appengine-admin'
+  implementation 'com.google.cloud:google-cloud-run'
   implementation "com.azure.resourcemanager:azure-resourcemanager:2.19.0"
   implementation "com.azure:azure-storage-blob:12.19.1"
   implementation 'commons-collections:commons-collections:3.2.2'

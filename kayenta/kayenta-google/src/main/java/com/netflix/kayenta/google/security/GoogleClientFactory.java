@@ -16,20 +16,14 @@
 
 package com.netflix.kayenta.google.security;
 
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.services.monitoring.v3.Monitoring;
-import com.google.api.services.monitoring.v3.MonitoringScopes;
-import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.StorageScopes;
-import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.http.HttpTransportOptions;
+import com.google.cloud.monitoring.v3.MetricServiceClient;
+import com.google.cloud.monitoring.v3.MetricServiceSettings;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Optional;
 import lombok.Getter;
 import lombok.ToString;
@@ -49,57 +43,25 @@ public class GoogleClientFactory {
     this.project = project;
   }
 
-  public Monitoring getMonitoring() throws IOException {
-    HttpTransport httpTransport = buildHttpTransport();
-    JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
-    GoogleCredentials credentials = getCredentials(MonitoringScopes.all());
-    HttpRequestInitializer reqInit = setHttpTimeout(credentials);
-    String applicationName = "Spinnaker/" + applicationVersion;
-
-    return new Monitoring.Builder(httpTransport, jsonFactory, reqInit)
-        .setApplicationName(applicationName)
-        .build();
+  public MetricServiceClient getMonitoring() throws IOException {
+    return MetricServiceClient.create(
+        MetricServiceSettings.newBuilder().setCredentialsProvider(this::getCredentials).build());
   }
 
   public Storage getStorage() throws IOException {
-    HttpTransport httpTransport = buildHttpTransport();
-    JsonFactory jsonFactory = JacksonFactory.getDefaultInstance();
-    GoogleCredentials credentials = getCredentials(StorageScopes.all());
-    HttpRequestInitializer reqInit = setHttpTimeout(credentials);
-    String applicationName = "Spinnaker/" + applicationVersion;
-
-    return new Storage.Builder(httpTransport, jsonFactory, reqInit)
-        .setApplicationName(applicationName)
-        .build();
+    return StorageOptions.newBuilder()
+        .setProjectId(project)
+        .setCredentials(getCredentials())
+        .setTransportOptions(
+            HttpTransportOptions.newBuilder()
+                .setReadTimeout(2 * 60000)
+                .setConnectTimeout(5000)
+                .build())
+        .build()
+        .getService();
   }
 
-  protected GoogleCredentials getCredentials(Collection<String> scopes) throws IOException {
-    log.debug(
-        "Loading credentials for project {} using application default credentials, with scopes {}.",
-        project,
-        scopes);
-
-    // No JSON key was specified in matching config on key server, so use application default
-    // credentials.
-    return GoogleCredentials.getApplicationDefault().createScoped(scopes);
-  }
-
-  protected HttpTransport buildHttpTransport() {
-    try {
-      return GoogleNetHttpTransport.newTrustedTransport();
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to create trusted transport", e);
-    }
-  }
-
-  static HttpRequestInitializer setHttpTimeout(final GoogleCredentials credentials) {
-    return new HttpCredentialsAdapter(credentials) {
-      @Override
-      public void initialize(HttpRequest httpRequest) throws IOException {
-        super.initialize(httpRequest);
-        httpRequest.setConnectTimeout(2 * 60000); // 2 minutes connect timeout
-        httpRequest.setReadTimeout(2 * 60000); // 2 minutes read timeout
-      }
-    };
+  protected Credentials getCredentials() throws IOException {
+    return GoogleCredentials.getApplicationDefault();
   }
 }

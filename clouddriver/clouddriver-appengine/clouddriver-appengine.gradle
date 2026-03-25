@@ -9,8 +9,8 @@ dependencies {
   implementation project(":clouddriver-google-common")
   implementation project(":clouddriver-security")
 
-  implementation "com.google.apis:google-api-services-appengine"
-  implementation "com.google.apis:google-api-services-storage"
+  implementation "com.google.cloud:google-cloud-appengine-admin"
+  implementation 'com.google.cloud:google-cloud-storage'
   implementation 'com.google.auth:google-auth-library-oauth2-http'
   implementation "com.jcraft:jsch"
   implementation "com.netflix.frigga:frigga"

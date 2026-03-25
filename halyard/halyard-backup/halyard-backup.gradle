@@ -5,8 +5,8 @@ dependencies {
   implementation 'org.springframework.boot:spring-boot-starter-actuator'
   implementation 'org.springframework.boot:spring-boot-starter-web'
   // TODO(lwander) Move to spinnaker-dependencies
-  implementation 'com.google.apis:google-api-services-cloudkms:v1-rev8-1.22.0'
-  implementation 'com.google.apis:google-api-services-storage'
+  implementation 'com.google.cloud:google-cloud-storage'
+  implementation 'com.google.cloud:google-cloud-kms'
   implementation 'com.google.auth:google-auth-library-oauth2-http'
   implementation 'org.apache.commons:commons-lang3'
   implementation 'commons-io:commons-io'

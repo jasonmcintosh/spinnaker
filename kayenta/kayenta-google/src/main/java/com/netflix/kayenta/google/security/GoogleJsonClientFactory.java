@@ -16,11 +16,10 @@
 
 package com.netflix.kayenta.google.security;
 
+import com.google.auth.Credentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.Collection;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
@@ -38,12 +37,8 @@ public class GoogleJsonClientFactory extends GoogleClientFactory {
   }
 
   @Override
-  protected GoogleCredentials getCredentials(Collection<String> scopes) throws IOException {
-    log.debug(
-        "Loading credentials for project {} from json key, with scopes {}.", getProject(), scopes);
-
-    InputStream credentialStream = new ByteArrayInputStream(jsonKey.getBytes("UTF-8"));
-
-    return GoogleCredentials.fromStream(credentialStream).createScoped(scopes);
+  protected Credentials getCredentials() throws IOException {
+    log.debug("Loading credentials for project {} from json key.", getProject());
+    return GoogleCredentials.fromStream(new ByteArrayInputStream(jsonKey.getBytes("UTF-8")));
   }
 }

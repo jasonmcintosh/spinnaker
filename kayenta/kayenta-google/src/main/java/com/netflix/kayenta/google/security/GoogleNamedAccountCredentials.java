@@ -17,8 +17,8 @@
 package com.netflix.kayenta.google.security;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.api.services.monitoring.v3.Monitoring;
-import com.google.api.services.storage.Storage;
+import com.google.cloud.monitoring.v3.MetricServiceClient;
+import com.google.cloud.storage.Storage;
 import com.netflix.kayenta.security.AccountCredentials;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -47,7 +47,7 @@ public class GoogleNamedAccountCredentials extends AccountCredentials<GoogleClie
     return getSupportedTypes().contains(Type.METRICS_STORE) ? "stackdriver" : null;
   }
 
-  @JsonIgnore private Monitoring monitoring;
+  @JsonIgnore private MetricServiceClient monitoring;
 
   @JsonIgnore private Storage storage;
 }

@@ -17,12 +17,11 @@
 package com.netflix.spinnaker.clouddriver.appengine.security
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import com.google.api.services.appengine.v1.Appengine
+import com.google.appengine.v1.ApplicationsClient
 import com.netflix.spinnaker.clouddriver.appengine.AppengineCloudProvider
 import com.netflix.spinnaker.clouddriver.appengine.gitClient.AppengineGitCredentialType
 import com.netflix.spinnaker.clouddriver.appengine.gitClient.AppengineGitCredentials
 import com.netflix.spinnaker.clouddriver.security.AbstractAccountCredentials
-import com.netflix.spinnaker.clouddriver.security.AccountCredentials
 
 import com.netflix.spinnaker.fiat.model.resources.Permissions
 import groovy.transform.TupleConstructor
@@ -49,7 +48,7 @@ class AppengineNamedAccountCredentials extends AbstractAccountCredentials<Appeng
   final AppengineCredentials credentials
   final String applicationName
   @JsonIgnore
-  final Appengine appengine
+  final ApplicationsClient appengine
   @JsonIgnore
   final String serviceAccountEmail
   @JsonIgnore
@@ -80,7 +79,7 @@ class AppengineNamedAccountCredentials extends AbstractAccountCredentials<Appeng
     String gcloudPath
     String jsonPath
     String applicationName
-    Appengine appengine
+    ApplicationsClient appengine
     String serviceAccountEmail
     String localRepositoryDirectory
     String gitHttpsUsername
@@ -167,7 +166,7 @@ class AppengineNamedAccountCredentials extends AbstractAccountCredentials<Appeng
       return this
     }
 
-    Builder appengine(Appengine appengine) {
+    Builder appengine(ApplicationsClient appengine) {
       this.appengine = appengine
       return this
     }
@@ -261,6 +260,7 @@ class AppengineNamedAccountCredentials extends AbstractAccountCredentials<Appeng
       appengine = appengine ?: credentials.getAppengine(applicationName)
 
       if (liveLookupsEnabled) {
+        ApplicationsClient.create().getApplication(project).getLocationId();
         region = appengine.apps().get(project).execute().getLocationId()
       }
 

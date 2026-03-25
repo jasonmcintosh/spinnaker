@@ -16,13 +16,11 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy
 
-import com.google.api.services.appengine.v1.model.Version
+import com.google.appengine.v1.Version
 import com.netflix.frigga.Names
 import com.netflix.spinnaker.clouddriver.appengine.model.AppengineModelUtil
 import com.netflix.spinnaker.clouddriver.appengine.security.AppengineNamedAccountCredentials
 import com.netflix.spinnaker.clouddriver.helpers.AbstractServerGroupNameResolver
-
-import java.text.SimpleDateFormat
 
 class AppengineServerGroupNameResolver extends AbstractServerGroupNameResolver {
   private static final String PHASE = "DEPLOY"

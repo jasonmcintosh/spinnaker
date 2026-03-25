@@ -16,14 +16,20 @@
 
 package com.netflix.kayenta.stackdriver.metrics;
 
-import com.google.api.services.monitoring.v3.Monitoring;
-import com.google.api.services.monitoring.v3.model.ListMetricDescriptorsResponse;
-import com.google.api.services.monitoring.v3.model.ListTimeSeriesResponse;
-import com.google.api.services.monitoring.v3.model.Metric;
-import com.google.api.services.monitoring.v3.model.MetricDescriptor;
-import com.google.api.services.monitoring.v3.model.MonitoredResource;
-import com.google.api.services.monitoring.v3.model.Point;
-import com.google.api.services.monitoring.v3.model.TimeSeries;
+import com.google.api.Metric;
+import com.google.api.MetricDescriptor;
+import com.google.api.MonitoredResource;
+import com.google.cloud.monitoring.v3.MetricServiceClient;
+import com.google.monitoring.v3.Aggregation;
+import com.google.monitoring.v3.ListMetricDescriptorsRequest;
+import com.google.monitoring.v3.ListMetricDescriptorsResponse;
+import com.google.monitoring.v3.ListTimeSeriesRequest;
+import com.google.monitoring.v3.ListTimeSeriesResponse;
+import com.google.monitoring.v3.Point;
+import com.google.monitoring.v3.TimeInterval;
+import com.google.monitoring.v3.TimeSeries;
+import com.google.protobuf.Duration;
+import com.google.protobuf.Timestamp;
 import com.netflix.kayenta.canary.CanaryConfig;
 import com.netflix.kayenta.canary.CanaryMetricConfig;
 import com.netflix.kayenta.canary.CanaryScope;
@@ -45,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,6 +61,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.util.CollectionUtils;
@@ -260,6 +268,13 @@ public class StackdriverMetricsService implements MetricsService {
     return filter;
   }
 
+  private <E extends Enum<E>> E trinary(
+      String first, String second, E defaultToUse, Class<E> classToUse) {
+    if (ObjectUtils.isNotEmpty(first)) return Enum.valueOf(classToUse, first);
+    if (ObjectUtils.isNotEmpty(second)) return Enum.valueOf(classToUse, second);
+    return defaultToUse;
+  }
+
   @Override
   public List<MetricSet> queryMetrics(
       String metricsAccountName,
@@ -278,7 +293,7 @@ public class StackdriverMetricsService implements MetricsService {
     StackdriverCanaryScope stackdriverCanaryScope = (StackdriverCanaryScope) canaryScope;
     GoogleNamedAccountCredentials stackdriverCredentials =
         accountCredentialsRepository.getRequiredOne(metricsAccountName);
-    Monitoring monitoring = stackdriverCredentials.getMonitoring();
+    MetricServiceClient monitoring = stackdriverCredentials.getMonitoring();
     StackdriverCanaryMetricSetQueryConfig stackdriverMetricSetQuery =
         (StackdriverCanaryMetricSetQueryConfig) canaryMetricConfig.getQuery();
     String projectId = determineProjectId(metricsAccountName, stackdriverCanaryScope);
@@ -287,18 +302,19 @@ public class StackdriverMetricsService implements MetricsService {
         StringUtils.hasText(stackdriverMetricSetQuery.getResourceType())
             ? stackdriverMetricSetQuery.getResourceType()
             : stackdriverCanaryScope.getResourceType();
-    String crossSeriesReducer =
-        StringUtils.hasText(stackdriverMetricSetQuery.getCrossSeriesReducer())
-            ? stackdriverMetricSetQuery.getCrossSeriesReducer()
-            : StringUtils.hasText(stackdriverCanaryScope.getCrossSeriesReducer())
-                ? stackdriverCanaryScope.getCrossSeriesReducer()
-                : "REDUCE_MEAN";
-    String perSeriesAligner =
-        StringUtils.hasText(stackdriverMetricSetQuery.getPerSeriesAligner())
-            ? stackdriverMetricSetQuery.getPerSeriesAligner()
-            : StringUtils.hasText(stackdriverCanaryScope.getPerSeriesAligner())
-                ? stackdriverCanaryScope.getPerSeriesAligner()
-                : "ALIGN_MEAN";
+    Aggregation.Reducer crossSeriesReducer =
+        trinary(
+            stackdriverMetricSetQuery.getCrossSeriesReducer(),
+            stackdriverCanaryScope.getCrossSeriesReducer(),
+            Aggregation.Reducer.REDUCE_MEAN,
+            Aggregation.Reducer.class);
+
+    Aggregation.Aligner perSeriesAligner =
+        trinary(
+            stackdriverMetricSetQuery.getPerSeriesAligner(),
+            stackdriverMetricSetQuery.getPerSeriesAligner(),
+            Aggregation.Aligner.ALIGN_MEAN,
+            Aggregation.Aligner.class);
 
     if (StringUtils.isEmpty(projectId)) {
       projectId = stackdriverCredentials.getProject();
@@ -319,29 +335,46 @@ public class StackdriverMetricsService implements MetricsService {
     String filter = buildQuery(metricsAccountName, canaryConfig, canaryMetricConfig, canaryScope);
 
     long alignmentPeriodSec = stackdriverCanaryScope.getStep();
-    Monitoring.Projects.TimeSeries.List list =
-        monitoring
-            .projects()
-            .timeSeries()
-            .list("projects/" + stackdriverCredentials.getProject())
-            .setAggregationAlignmentPeriod(alignmentPeriodSec + "s")
-            .setAggregationCrossSeriesReducer(crossSeriesReducer)
-            .setAggregationPerSeriesAligner(perSeriesAligner)
-            .setFilter(filter)
-            .setIntervalStartTime(stackdriverCanaryScope.getStart().toString())
-            .setIntervalEndTime(stackdriverCanaryScope.getEnd().toString());
+    Aggregation.Builder aggregation =
+        Aggregation.newBuilder()
+            .setAlignmentPeriod(Duration.newBuilder().setSeconds(alignmentPeriodSec).build())
+            .setCrossSeriesReducer(crossSeriesReducer)
+            .setPerSeriesAligner(perSeriesAligner);
+
+    //    Monitoring.Projects.TimeSeries.List list =
+    //        monitoring
+    //            .projects()
+    //            .timeSeries()
+    //            .list("projects/" + stackdriverCredentials.getProject())
+    //            .setIntervalStartTime(stackdriverCanaryScope.getStart().toString())
+    //            .setIntervalEndTime(stackdriverCanaryScope.getEnd().toString());
 
     List<String> groupByFields = stackdriverMetricSetQuery.getGroupByFields();
-
     if (groupByFields != null) {
-      list.setAggregationGroupByFields(groupByFields);
+      aggregation.addAllGroupByFields(groupByFields);
     }
+    ListTimeSeriesRequest request =
+        ListTimeSeriesRequest.newBuilder()
+            .setFilter(filter)
+            .setName(projectId)
+            .setInterval(
+                TimeInterval.newBuilder()
+                    .setStartTime(
+                        Timestamp.newBuilder()
+                            .setSeconds(stackdriverCanaryScope.getStart().getEpochSecond())
+                            .build())
+                    .setEndTime(
+                        Timestamp.newBuilder()
+                            .setSeconds(stackdriverCanaryScope.getEnd().getEpochSecond())
+                            .build()))
+            .setAggregation(aggregation)
+            .build();
 
     long startTime = registry.clock().monotonicTime();
     ListTimeSeriesResponse response;
 
     try {
-      response = list.execute();
+      response = monitoring.listTimeSeriesCallable().call(request);
     } finally {
       long endTime = registry.clock().monotonicTime();
       Id stackdriverFetchTimerId =
@@ -364,19 +397,22 @@ public class StackdriverMetricsService implements MetricsService {
       numIntervals++;
     }
 
-    List<TimeSeries> timeSeriesList = response.getTimeSeries();
+    List<TimeSeries> timeSeriesList = response.getTimeSeriesList();
 
-    if (timeSeriesList == null || timeSeriesList.size() == 0) {
+    if (timeSeriesList.isEmpty()) {
       // Add placeholder metric set.
       timeSeriesList =
           Collections.singletonList(
-              new TimeSeries().setMetric(new Metric()).setPoints(new ArrayList<>()));
+              TimeSeries.newBuilder()
+                  .setMetric(Metric.newBuilder())
+                  .addAllPoints(new ArrayList<>())
+                  .build());
     }
 
     List<MetricSet> metricSetList = new ArrayList<>();
 
     for (TimeSeries timeSeries : timeSeriesList) {
-      List<Point> points = timeSeries.getPoints();
+      List<Point> points = timeSeries.getPointsList();
 
       if (points.size() != numIntervals) {
         String pointOrPoints = numIntervals == 1 ? "point" : "points";
@@ -388,14 +424,15 @@ public class StackdriverMetricsService implements MetricsService {
       Collections.reverse(points);
 
       Instant responseStartTimeInstant =
-          points.size() > 0
-              ? Instant.parse(points.get(0).getInterval().getStartTime())
+          !points.isEmpty()
+              ? Instant.ofEpochSecond(points.get(0).getInterval().getStartTime().getSeconds())
               : stackdriverCanaryScope.getStart();
       long responseStartTimeMillis = responseStartTimeInstant.toEpochMilli();
 
       Instant responseEndTimeInstant =
-          points.size() > 0
-              ? Instant.parse(points.get(points.size() - 1).getInterval().getEndTime())
+          !points.isEmpty()
+              ? Instant.ofEpochSecond(
+                  points.get(points.size() - 1).getInterval().getEndTime().getSeconds())
               : stackdriverCanaryScope.getEnd();
 
       // TODO(duftler): What if there are no data points?
@@ -467,8 +504,8 @@ public class StackdriverMetricsService implements MetricsService {
       metricSetBuilder.tags(filteredLabels);
 
       metricSetBuilder.attribute("query", filter);
-      metricSetBuilder.attribute("crossSeriesReducer", crossSeriesReducer);
-      metricSetBuilder.attribute("perSeriesAligner", perSeriesAligner);
+      metricSetBuilder.attribute("crossSeriesReducer", crossSeriesReducer.toString());
+      metricSetBuilder.attribute("perSeriesAligner", perSeriesAligner.toString());
 
       metricSetList.add(metricSetBuilder.build());
     }
@@ -492,17 +529,20 @@ public class StackdriverMetricsService implements MetricsService {
 
   @Override
   public List<Map> getMetadata(String metricsAccountName, String filter) {
+    List<Map> result = new LinkedList<>();
     if (!StringUtils.isEmpty(filter)) {
       String lowerCaseFilter = filter.toLowerCase();
 
-      return metricDescriptorsCache.stream()
+      metricDescriptorsCache.stream()
           .filter(
               metricDescriptor ->
                   metricDescriptor.getName().toLowerCase().contains(lowerCaseFilter))
-          .collect(Collectors.toList());
+          .forEach(each -> result.add(Map.of(each.getName(), each.getMetadata())));
     } else {
-      return metricDescriptorsCache.stream().collect(Collectors.toList());
+      metricDescriptorsCache.stream()
+          .forEach(each -> result.add(Map.of(each.getName(), each.getMetadata())));
     }
+    return result;
   }
 
   @Scheduled(fixedDelayString = "#{@stackdriverConfigurationProperties.metadataCachingIntervalMS}")
@@ -514,15 +554,14 @@ public class StackdriverMetricsService implements MetricsService {
       if (credentials instanceof GoogleNamedAccountCredentials) {
         GoogleNamedAccountCredentials stackdriverCredentials =
             (GoogleNamedAccountCredentials) credentials;
+        ListMetricDescriptorsRequest request =
+            ListMetricDescriptorsRequest.newBuilder()
+                .setName(stackdriverCredentials.getProject())
+                .build();
         ListMetricDescriptorsResponse listMetricDescriptorsResponse =
-            stackdriverCredentials
-                .getMonitoring()
-                .projects()
-                .metricDescriptors()
-                .list("projects/" + stackdriverCredentials.getProject())
-                .execute();
+            stackdriverCredentials.getMonitoring().listMetricDescriptorsCallable().call(request);
         List<MetricDescriptor> metricDescriptors =
-            listMetricDescriptorsResponse.getMetricDescriptors();
+            listMetricDescriptorsResponse.getMetricDescriptorsList();
 
         if (!CollectionUtils.isEmpty(metricDescriptors)) {
           // TODO(duftler): Should we instead be building the union across all accounts? This

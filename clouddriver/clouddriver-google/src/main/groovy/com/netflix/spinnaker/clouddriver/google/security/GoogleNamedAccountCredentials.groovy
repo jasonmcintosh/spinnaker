@@ -18,6 +18,10 @@ package com.netflix.spinnaker.clouddriver.google.security
 
 import com.google.api.services.compute.Compute
 import com.google.api.services.compute.model.*
+import com.google.cloud.compute.v1.AcceleratorTypeAggregatedList
+import com.google.cloud.compute.v1.Compute
+import com.google.cloud.compute.v1.Region
+import com.google.cloud.compute.v1.RegionList
 import com.google.common.annotations.VisibleForTesting
 import com.netflix.spinnaker.clouddriver.consul.config.ConsulConfig
 import com.netflix.spinnaker.clouddriver.google.ComputeVersion
@@ -349,8 +353,8 @@ class GoogleNamedAccountCredentials extends AbstractAccountCredentials<GoogleCre
 
   @VisibleForTesting
   static Map<String, List<String>> convertRegionListToMap(RegionList regionList) {
-    return regionList.items.collectEntries { Region region ->
-      [(region.name): region.zones.collect { String zone -> GCEUtil.getLocalName(zone) }]
+    return regionList.getItemsList().collectEntries { Region region ->
+      [(region.name): region.getZonesList().collect { String zone -> GCEUtil.getLocalName(zone) }]
     }
   }
 

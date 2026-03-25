@@ -16,9 +16,9 @@
 
 package com.netflix.spinnaker.clouddriver.google.deploy
 
-import com.google.api.services.compute.Compute
-import com.google.api.services.compute.model.Operation
+import com.google.cloud.compute.v1.Compute
 import com.google.common.annotations.VisibleForTesting
+import com.google.longrunning.Operation
 import com.netflix.spectator.api.Clock;
 import com.netflix.spectator.api.Id;
 import com.netflix.spectator.api.Registry;

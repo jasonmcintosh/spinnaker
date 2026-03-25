@@ -18,5 +18,8 @@ apply plugin: "java-library"
 
 dependencies {
   api(platform(project(":spinnaker-dependencies")))
+  //TODO: Replace this which is dead with one of numerous other solutions out there
   api("com.google.code.findbugs:jsr305")
+//  api("org.jspecify:jspecify:1.0.0")
+//   api("com.github.spotbugs:spotbugs-annotations")
 }

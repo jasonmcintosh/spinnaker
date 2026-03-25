@@ -16,15 +16,6 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.artifacts;
 
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.HttpRequestInitializer;
-import com.google.api.client.http.HttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.services.storage.Storage;
-import com.google.api.services.storage.StorageScopes;
-import com.google.api.services.storage.model.Objects;
-import com.google.api.services.storage.model.StorageObject;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -147,10 +138,6 @@ public class GcsStorageService {
     } catch (InterruptedException intex) {
       throw new IllegalStateException(intex);
     }
-  }
-
-  public void visitObjects(String bucketName, VisitorOperation op) throws IOException {
-    visitObjects(bucketName, "", op);
   }
 
   public void downloadStorageObjectRelative(

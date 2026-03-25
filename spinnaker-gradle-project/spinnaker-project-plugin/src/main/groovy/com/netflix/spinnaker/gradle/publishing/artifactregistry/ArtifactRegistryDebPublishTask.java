@@ -1,20 +1,23 @@
 package com.netflix.spinnaker.gradle.publishing.artifactregistry;
 
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
-import com.google.api.services.artifactregistry.v1beta2.ArtifactRegistryScopes;
-import com.google.api.services.artifactregistry.v1beta2.model.ImportAptArtifactsGcsSource;
-import com.google.api.services.artifactregistry.v1beta2.model.ImportAptArtifactsRequest;
-import com.google.api.services.artifactregistry.v1beta2.model.Operation;
-import com.google.api.services.artifactregistry.v1beta2.ArtifactRegistry;
+
+import com.google.api.gax.core.GoogleCredentialsProvider;
 import com.google.auth.Credentials;
-import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.artifactregistry.auth.DefaultCredentialProvider;
-import com.google.cloud.storage.*;
+
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageException;
+import com.google.cloud.storage.StorageOptions;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.io.ByteStreams;
+import com.google.devtools.artifactregistry.v1.ArtifactRegistryClient;
+import com.google.devtools.artifactregistry.v1.ArtifactRegistrySettings;
+import com.google.devtools.artifactregistry.v1.ImportAptArtifactsGcsSource;
+import com.google.devtools.artifactregistry.v1.ImportAptArtifactsRequest;
+import com.google.longrunning.Operation;
 import org.apache.tools.ant.filters.StringInputStream;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.file.RegularFile;
@@ -30,6 +33,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.security.GeneralSecurityException;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 class ArtifactRegistryDebPublishTask extends DefaultTask {
@@ -44,7 +48,8 @@ class ArtifactRegistryDebPublishTask extends DefaultTask {
   private Provider<Integer> aptImportTimeoutSeconds;
 
   @Inject
-  public ArtifactRegistryDebPublishTask() {}
+  public ArtifactRegistryDebPublishTask() {
+  }
 
   @Input
   public Provider<String> getUploadBucket() {
@@ -108,11 +113,11 @@ class ArtifactRegistryDebPublishTask extends DefaultTask {
 
     deleteDebFromGcs(storage, blobId);
 
-    if (!operationIsDone(importOperation)) {
+    if (!importOperation.getDone()) {
       throw new IOException("Operation timed out importing debian package to Artifact Registry.");
-    } else if (getErrors(importOperation) != null) {
+    } else if (importOperation.hasError()) {
       throw new IOException(
-        "Received an error importing debian package to Artifact Registry: " + getErrors(importOperation)
+        "Received an error importing debian package to Artifact Registry: " + importOperation.getError().getMessage()
       );
     }
   }
@@ -130,11 +135,10 @@ class ArtifactRegistryDebPublishTask extends DefaultTask {
 
     if (!Strings.isNullOrEmpty(fromEnvironmentVar)) {
       return GoogleCredentials.fromStream(new StringInputStream(fromEnvironmentVar)).createScoped(
-        ArtifactRegistryScopes.CLOUD_PLATFORM
+        "https://www.googleapis.com/auth/cloud-platform" //https://docs.cloud.google.com/docs/authentication#authorization-gcp
       );
     }
-
-    return DefaultCredentialProvider.getInstance().getCredential();
+    return GoogleCredentialsProvider.newBuilder().build().getCredentials();
   }
 
   /**
@@ -144,64 +148,47 @@ class ArtifactRegistryDebPublishTask extends DefaultTask {
    * If the Operation is not done, that means we timed out before finishing the import. The operation
    * should also be checked for errors.
    */
-  private Operation importDebToArtifactRegistry(BlobId blobId) throws GeneralSecurityException, IOException,
+  private Operation importDebToArtifactRegistry(BlobId blobId) throws IOException,
     InterruptedException {
 
-    ArtifactRegistry artifactRegistryClient = new ArtifactRegistry(
-      GoogleNetHttpTransport.newTrustedTransport(), JacksonFactory.getDefaultInstance(), new HttpCredentialsAdapter(
-        resolveCredentials()
-      )
-    );
+    ArtifactRegistrySettings settings = ArtifactRegistrySettings.newBuilder().setCredentialsProvider(this::resolveCredentials).build();
+    try (ArtifactRegistryClient artifactRegistryClient = ArtifactRegistryClient.create(settings)) {
 
-    String parent = String.format(
-      "projects/%s/locations/%s/repositories/%s",
-      repoProject.get(),
-      location.get(),
-      repository.get()
-    );
-    ImportAptArtifactsGcsSource gcsSource = new ImportAptArtifactsGcsSource();
-    gcsSource.setUris(List.of(String.format("gs://%s/%s", blobId.getBucket(), blobId.getName())));
 
-    ImportAptArtifactsRequest content = new ImportAptArtifactsRequest();
-    content.setGcsSource(gcsSource);
-
-    ArtifactRegistry.Projects.Locations.Repositories.AptArtifacts.ArtifactRegistryImport request =
-      artifactRegistryClient.projects().locations().repositories().aptArtifacts().artifactregistryImport(
-        parent,
-        content
+      String parent = String.format(
+        "projects/%s/locations/%s/repositories/%s",
+        repoProject.get(),
+        location.get(),
+        repository.get()
       );
+      ImportAptArtifactsGcsSource gcsSource = ImportAptArtifactsGcsSource.newBuilder()
+        .addAllUris(List.of(String.format("gs://%s/%s", blobId.getBucket(), blobId.getName()))).build();
 
-    Operation operation = request.execute();
+      ImportAptArtifactsRequest content = ImportAptArtifactsRequest.newBuilder().setGcsSource(gcsSource).setParent(parent).build();
 
-    Stopwatch timer = Stopwatch.createStarted();
-    while (!operationIsDone(operation) && !operationTimedOut(timer)) {
-      Thread.sleep(30000);
-      operation = artifactRegistryClient.projects().locations().operations().get(operation.getName()).execute();
+
+      Stopwatch timer = Stopwatch.createStarted();
+      Operation operation = null;
+      while (operation == null || !operation.getDone() && !operationTimedOut(timer)) {
+        Thread.sleep(30000);
+        operation = artifactRegistryClient.importAptArtifactsCallable().call(content);
+      }
+
+      return operation;
     }
-
-    return operation;
   }
 
   private BlobId uploadDebToGcs(Storage storage) throws IOException {
     BlobId blobId = BlobId.of(uploadBucket.get(), archiveFile.get().getAsFile().getName());
     BlobInfo blobInfo = BlobInfo.newBuilder(blobId).build();
     try (ByteChannel fileChannel = Files.newByteChannel(archiveFile.get().getAsFile().toPath());
-      WritableByteChannel gcsChannel = storage.writer(blobInfo)) {
+         WritableByteChannel gcsChannel = storage.writer(blobInfo)) {
       ByteStreams.copy(fileChannel, gcsChannel);
     }
     return blobId;
   }
 
-  /** Checks for done, correctly handling a null result. */
-  private boolean operationIsDone(Operation operation) {
-    return Boolean.TRUE.equals(operation.getDone());
-  }
-
   private boolean operationTimedOut(Stopwatch timer) {
     return timer.elapsed(TimeUnit.SECONDS) > aptImportTimeoutSeconds.get();
-  }
-
-  private Object getErrors(Operation operation) {
-    return operation.getResponse().get("errors");
   }
 }

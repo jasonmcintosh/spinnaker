@@ -38,7 +38,6 @@ public class AppengineCredentials extends GoogleCommonCredentials {
     JsonFactory jsonFactory = GsonFactory.getDefaultInstance();
     GoogleCredentials credentials = getCredentials();
     HttpRequestInitializer requestInitializer = new HttpCredentialsAdapter(credentials);
-
     return new Appengine.Builder(httpTransport, jsonFactory, requestInitializer)
         .setApplicationName(applicationName)
         .build();

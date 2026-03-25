@@ -16,11 +16,12 @@
 
 package com.netflix.spinnaker.clouddriver.appengine.deploy
 
-import com.google.api.client.googleapis.batch.BatchRequest
-import com.google.api.client.http.HttpHeaders
-import com.google.api.services.appengine.v1.model.ListVersionsResponse
-import com.google.api.services.appengine.v1.model.Service
-import com.google.api.services.appengine.v1.model.Version
+import com.google.appengine.v1.ListVersionsResponse
+import com.google.appengine.v1.Service
+import com.google.appengine.v1.ServicesClient
+import com.google.appengine.v1.ServicesSettings
+import com.google.appengine.v1.Version
+import com.google.monitoring.v3.ListServicesRequest
 import com.netflix.spinnaker.clouddriver.appengine.provider.callbacks.AppengineCallback
 import com.netflix.spinnaker.clouddriver.appengine.security.AppengineNamedAccountCredentials
 import com.netflix.spinnaker.clouddriver.data.task.Task
@@ -35,24 +36,20 @@ class AppengineUtils {
 
     // TODO(jacobkiefer): Consider limiting batch sizes.
     // https://github.com/spinnaker/spinnaker/issues/3564.
-    BatchRequest batch = credentials.appengine.batch()
     def allVersions = []
 
     services.each { service ->
       def callback = new AppengineCallback<ListVersionsResponse>()
         .success { ListVersionsResponse versionsResponse, HttpHeaders responseHeaders ->
-          def versions = versionsResponse.getVersions()
+          def versions = versionsResponse.getVersionsList()
           if (versions) {
             allVersions << versions
           }
         }
 
-      credentials.appengine.apps().services().versions().list(project, service.getId()).queue(batch, callback)
+      credentials.appengine.getAapps().services().versions().list(project, service.getId()).queue(batch, callback)
     }
 
-    if (batch.size() > 0) {
-      batch.execute()
-    }
 
     return allVersions.flatten()
   }
@@ -62,6 +59,7 @@ class AppengineUtils {
                                         Task task,
                                         String phase) {
     task.updateStatus phase, "Querying services for project $project..."
+    services = ServicesClient.create(ServicesSettings.create()).listServicesCallable().call(ListServicesRequest.newBuilder()).getServicesList();
     return credentials.appengine.apps().services().list(project).execute().getServices()
   }
 

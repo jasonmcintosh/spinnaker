@@ -3,5 +3,5 @@ dependencies {
   implementation project(":kayenta-google")
 
   api "io.spinnaker.kork:kork-exceptions"
-  api "com.google.apis:google-api-services-storage"
+  api 'com.google.cloud:google-cloud-storage'
 }

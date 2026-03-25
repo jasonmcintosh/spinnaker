@@ -11,13 +11,13 @@ ext {
     awsv2            : "2.23.7",
     bouncycastle     : "1.81", // fixes CVE-2024-34447
     brave            : "5.12.3",
-    gcp              : "26.34.0",
+    googleLibraries  : "26.73.0", // this sets protobuff, grpc, guava versions
+    googleCloud      : "0.259.0",
     groovy           : "4.0.15",
     jsch             : "0.1.54",
     jschAgentProxy   : "0.0.9",
     log4j            : "2.25.1",
     log4jKotlin      : "1.5.0",
-    protobuf         : "3.25.2",
     openapi          : "2.2.0",
     retrofit2        : "2.8.1",
     spectator        : "1.0.6",
@@ -57,8 +57,6 @@ dependencies {
   api(platform("io.zipkin.brave:brave-bom:${versions.brave}"))
   api(platform("org.springframework.boot:spring-boot-dependencies:${versions.springBoot}"))
   api(platform("com.amazonaws:aws-java-sdk-bom:${versions.aws}"))
-  api(platform("com.google.protobuf:protobuf-bom:${versions.protobuf}"))
-  api(platform("com.google.cloud:libraries-bom:${versions.gcp}"))
   api(platform("software.amazon.awssdk:bom:${versions.awsv2}"))
   api(platform("org.springframework.cloud:spring-cloud-dependencies:${versions.springCloud}"))
   api(platform("io.strikt:strikt-bom:0.31.0"))
@@ -67,21 +65,19 @@ dependencies {
   api(platform("org.testcontainers:testcontainers-bom:1.21.4"))
   api(platform("io.arrow-kt:arrow-stack:${versions.arrow}"))
 
+  //https://docs.cloud.google.com/apis/docs/client-libraries-explained See this.  The libraries covers 90% of things but the cloud BOM... is somewaht related but STILL slightly different
+  //THere are a couple of libraries SPECIFICALLY around the workspaces SDK's that don't reside in the com.google.cloud it seems.  E.g. workspace directory services.
+  // these will be defined below.
+  api(platform("com.google.cloud:libraries-bom:${versions.googleLibraries}"))// this vs. google-cloud-bom, per https://github.com/googleapis/java-cloud-bom/tree/main/google-cloud-bom
+  api(platform("com.google.cloud:google-cloud-bom:${versions.googleCloud}")) // make sure this matches the gradle project dep versions
+
+
   constraints {
     api("cglib:cglib-nodep:3.3.0")
     api("com.amazonaws:aws-java-sdk:${versions.aws}")
-    api("com.google.api-client:google-api-client:2.4.1")
-    api("com.google.apis:google-api-services-admin-directory:directory_v1-rev20240429-2.0.0")
-    api("com.google.apis:google-api-services-cloudbuild:v1-rev20240427-2.0.0")
-    api("com.google.apis:google-api-services-compute:beta-rev20240430-2.0.0")
-    api("com.google.apis:google-api-services-iam:v1-rev20240502-2.0.0")
-    api("com.google.apis:google-api-services-monitoring:v3-rev20240427-2.0.0")
-    api("com.google.apis:google-api-services-storage:v1-rev20240319-2.0.0")
-    api("com.google.apis:google-api-services-appengine:v1-rev20240415-2.0.0")
-    api("com.google.apis:google-api-services-run:v1-rev20240426-2.0.0")
-    api("com.google.cloud:google-cloud-secretmanager:2.37.0")
+    api("com.google.apis:google-api-services-admin-directory:directory_v1-rev20260227-2.0.0")
+//  TODO: moved to spotbugs or a more modern library (e.g.  api("com.google.spotbugs:spotbugs-annotations:4.9.2")) , this one is "dead" and likely to cause issues in the future
     api("com.google.code.findbugs:jsr305:3.0.2")
-    api("com.google.guava:guava:33.0.0-jre")
     api("com.hubspot.jinjava:jinjava:2.7.6") // fixes CVE-2026-25526
     api("com.jayway.jsonpath:json-path:2.9.0") // until spring boot >= 3.1.9 or 3.2.3
     api("com.jcraft:jsch:${versions.jsch}")
