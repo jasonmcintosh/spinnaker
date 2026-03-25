@@ -64,6 +64,7 @@ dependencies {
   api(platform("com.oracle.oci.sdk:oci-java-sdk-bom:3.21.0"))
   api(platform("org.testcontainers:testcontainers-bom:1.21.4"))
   api(platform("io.arrow-kt:arrow-stack:${versions.arrow}"))
+  api(platform("io.opentelemetry:opentelemetry-bom:1.40.0"))
 
   //https://docs.cloud.google.com/apis/docs/client-libraries-explained See this.  The libraries covers 90% of things but the cloud BOM... is somewaht related but STILL slightly different
   //THere are a couple of libraries SPECIFICALLY around the workspaces SDK's that don't reside in the com.google.cloud it seems.  E.g. workspace directory services.
