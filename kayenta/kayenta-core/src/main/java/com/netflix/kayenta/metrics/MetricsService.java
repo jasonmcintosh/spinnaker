@@ -44,7 +44,8 @@ public interface MetricsService {
       CanaryScope canaryScope)
       throws IOException;
 
-  default List<Map> getMetadata(String metricsAccountName, String filter) throws IOException {
+  default List<Map<String, ?>> getMetadata(String metricsAccountName, String filter)
+      throws IOException {
     return Collections.emptyList();
   }
 }

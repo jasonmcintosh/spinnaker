@@ -2,4 +2,5 @@ dependencies {
   implementation project(":kayenta-core")
   implementation project(":kayenta-google")
   api 'com.google.cloud:google-cloud-monitoring'
+  implementation("commons-beanutils:commons-beanutils:1.11.0")
 }

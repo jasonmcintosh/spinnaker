@@ -52,7 +52,7 @@ public class PrometheusMetricDescriptorsCacheTest {
   public void returnsEmptyMapIfNoDataForEmptyFilter() {
     cache.updateMetricDescriptorsCache();
 
-    List<Map> metadata = cache.getMetadata(ACCOUNT_1, "");
+    List<Map<String, ?>> metadata = cache.getMetadata(ACCOUNT_1, "");
 
     assertThat(metadata).isEmpty();
   }
@@ -61,7 +61,7 @@ public class PrometheusMetricDescriptorsCacheTest {
   public void returnsEmptyMapIfNoDataForMetricFilter() {
     cache.updateMetricDescriptorsCache();
 
-    List<Map> metadata = cache.getMetadata(ACCOUNT_1, "metric_1");
+    List<Map<String, ?>> metadata = cache.getMetadata(ACCOUNT_1, "metric_1");
 
     assertThat(metadata).isEmpty();
   }
@@ -84,7 +84,7 @@ public class PrometheusMetricDescriptorsCacheTest {
 
     cache.updateMetricDescriptorsCache();
 
-    List<Map> metadata = cache.getMetadata(ACCOUNT_1, "METR");
+    List<Map<String, ?>> metadata = cache.getMetadata(ACCOUNT_1, "METR");
 
     assertThat(metadata)
         .containsOnly(
@@ -132,7 +132,7 @@ public class PrometheusMetricDescriptorsCacheTest {
 
     cache.updateMetricDescriptorsCache();
 
-    List<Map> metadata = cache.getMetadata(ACCOUNT_1, "");
+    List<Map<String, ?>> metadata = cache.getMetadata(ACCOUNT_1, "");
 
     assertThat(metadata)
         .containsOnly(

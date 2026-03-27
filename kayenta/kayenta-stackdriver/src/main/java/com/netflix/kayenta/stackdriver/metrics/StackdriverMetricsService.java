@@ -61,6 +61,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -356,7 +357,7 @@ public class StackdriverMetricsService implements MetricsService {
     ListTimeSeriesRequest request =
         ListTimeSeriesRequest.newBuilder()
             .setFilter(filter)
-            .setName(projectId)
+            .setName("projects/" + projectId)
             .setInterval(
                 TimeInterval.newBuilder()
                     .setStartTime(
@@ -442,29 +443,23 @@ public class StackdriverMetricsService implements MetricsService {
         log.warn("No data points available.");
         pointValues = Collections.emptyList();
       } else {
-        if (timeSeries.getValueType() != null) {
-          if (timeSeries.getValueType().equals("INT64")) {
+        switch (timeSeries.getValueType()) {
+          case INT64:
             pointValues =
-                points.stream()
-                    .map(point -> (double) point.getValue().getInt64Value())
-                    .collect(Collectors.toList());
-          } else if (timeSeries.getValueType().equals("DOUBLE")) {
-            pointValues =
-                points.stream()
-                    .map(point -> point.getValue().getDoubleValue())
-                    .collect(Collectors.toList());
-          } else {
+                points.stream().map(point -> (double) point.getValue().getInt64Value()).toList();
+            break;
+          case DOUBLE:
+            pointValues = points.stream().map(point -> point.getValue().getDoubleValue()).toList();
+            break;
+          case STRING:
             log.warn(
                 "Expected timeSeries value type to be either DOUBLE or INT64. Got {}.",
                 timeSeries.getValueType());
-            pointValues =
-                points.stream()
-                    .map(point -> point.getValue().getDoubleValue())
-                    .collect(Collectors.toList());
-          }
-        } else {
-          log.warn("timeSeries valueType is null.");
-          pointValues = Collections.emptyList(); // Handle null valueType case as well
+            pointValues = points.stream().map(point -> point.getValue().getDoubleValue()).toList();
+            break;
+          default:
+            log.warn("Time series type was not one we can handle");
+            pointValues = Collections.emptyList();
         }
       }
 
@@ -528,8 +523,8 @@ public class StackdriverMetricsService implements MetricsService {
   }
 
   @Override
-  public List<Map> getMetadata(String metricsAccountName, String filter) {
-    List<Map> result = new LinkedList<>();
+  public List<Map<String, ?>> getMetadata(String metricsAccountName, String filter) {
+    List<Map<String, ?>> result = new LinkedList<>();
     if (!StringUtils.isEmpty(filter)) {
       String lowerCaseFilter = filter.toLowerCase();
 
@@ -537,10 +532,24 @@ public class StackdriverMetricsService implements MetricsService {
           .filter(
               metricDescriptor ->
                   metricDescriptor.getName().toLowerCase().contains(lowerCaseFilter))
-          .forEach(each -> result.add(Map.of(each.getName(), each.getMetadata())));
+          .forEach(
+              each -> {
+                try {
+                  result.add(PropertyUtils.describe(each));
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              });
     } else {
       metricDescriptorsCache.stream()
-          .forEach(each -> result.add(Map.of(each.getName(), each.getMetadata())));
+          .forEach(
+              each -> {
+                try {
+                  result.add(PropertyUtils.describe(each));
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              });
     }
     return result;
   }
@@ -554,9 +563,10 @@ public class StackdriverMetricsService implements MetricsService {
       if (credentials instanceof GoogleNamedAccountCredentials) {
         GoogleNamedAccountCredentials stackdriverCredentials =
             (GoogleNamedAccountCredentials) credentials;
+        log.info("Getting descriptors for {}", stackdriverCredentials.getName());
         ListMetricDescriptorsRequest request =
             ListMetricDescriptorsRequest.newBuilder()
-                .setName(stackdriverCredentials.getProject())
+                .setName("projects/" + stackdriverCredentials.getProject())
                 .build();
         ListMetricDescriptorsResponse listMetricDescriptorsResponse =
             stackdriverCredentials.getMonitoring().listMetricDescriptorsCallable().call(request);

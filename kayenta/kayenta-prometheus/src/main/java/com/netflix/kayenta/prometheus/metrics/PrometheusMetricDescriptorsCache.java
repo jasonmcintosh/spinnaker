@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,7 @@ import org.springframework.util.StringUtils;
 @Slf4j
 public class PrometheusMetricDescriptorsCache {
 
-  private volatile Map<String, List<PrometheusMetricDescriptor>> cache = Collections.emptyMap();
+  private volatile Map<String, List<PrometheusMetricDescriptor>> cache = new ConcurrentHashMap<>();
 
   private final AccountCredentialsRepository accountCredentialsRepository;
 
@@ -45,7 +46,7 @@ public class PrometheusMetricDescriptorsCache {
     this.accountCredentialsRepository = accountCredentialsRepository;
   }
 
-  public List<Map> getMetadata(String metricsAccountName, String filter) {
+  public List<Map<String, ?>> getMetadata(String metricsAccountName, String filter) {
     List<PrometheusMetricDescriptor> accountSpecificMetricDescriptorsCache =
         this.cache.get(metricsAccountName);
 
@@ -74,18 +75,16 @@ public class PrometheusMetricDescriptorsCache {
     Set<AccountCredentials> accountCredentialsSet =
         accountCredentialsRepository.getAllOf(AccountCredentials.Type.METRICS_STORE);
 
-    Map<String, List<PrometheusMetricDescriptor>> updatedCache =
+    this.cache =
         accountCredentialsSet.stream()
-            .filter(credentials -> credentials instanceof PrometheusManagedAccount)
-            .map(credentials -> (PrometheusManagedAccount) credentials)
+            .filter(PrometheusManagedAccount.class::isInstance)
+            .map(PrometheusManagedAccount.class::cast)
             .map(this::listMetricDescriptors)
             .filter(this::isSuccessful)
             .filter(this::hasData)
             .collect(
                 Collectors.toMap(
                     AccountResponse::getMetricsAccountName, this::toPrometheusMetricDescriptors));
-
-    this.cache = updatedCache;
   }
 
   private List<PrometheusMetricDescriptor> toPrometheusMetricDescriptors(

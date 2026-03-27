@@ -50,7 +50,7 @@ public class MetricsServiceMetadataController {
 
   @Operation(summary = "Retrieve a list of descriptors for use in populating the canary config ui")
   @RequestMapping(method = RequestMethod.GET)
-  public List<Map> listMetadata(
+  public List<Map<String, ?>> listMetadata(
       @RequestParam(required = false) final String metricsAccountName,
       @RequestParam(required = false) final String filter)
       throws IOException {
@@ -61,7 +61,8 @@ public class MetricsServiceMetadataController {
     MetricsService metricsService =
         metricsServiceRepository.getRequiredOne(resolvedMetricsAccountName);
 
-    List<Map> matchingDescriptors = metricsService.getMetadata(resolvedMetricsAccountName, filter);
+    List<Map<String, ?>> matchingDescriptors =
+        metricsService.getMetadata(resolvedMetricsAccountName, filter);
 
     if (StringUtils.isEmpty(filter)) {
       log.debug(

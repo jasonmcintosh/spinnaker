@@ -1,18 +1,18 @@
 package com.netflix.kayenta.stackdriver.metrics;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.api.services.monitoring.v3.Monitoring;
-import com.google.api.services.monitoring.v3.model.ListMetricDescriptorsResponse;
-import com.google.api.services.monitoring.v3.model.ListTimeSeriesResponse;
-import com.google.api.services.monitoring.v3.model.MetricDescriptor;
-import com.google.api.services.monitoring.v3.model.Point;
-import com.google.api.services.monitoring.v3.model.TimeInterval;
-import com.google.api.services.monitoring.v3.model.TimeSeries;
-import com.google.api.services.monitoring.v3.model.TypedValue;
+import com.google.api.MetricDescriptor;
+import com.google.cloud.monitoring.v3.MetricServiceClient;
+import com.google.monitoring.v3.ListTimeSeriesResponse;
+import com.google.monitoring.v3.Point;
+import com.google.monitoring.v3.TimeInterval;
+import com.google.monitoring.v3.TimeSeries;
+import com.google.monitoring.v3.TypedValue;
+import com.google.protobuf.Timestamp;
 import com.netflix.kayenta.canary.CanaryConfig;
 import com.netflix.kayenta.canary.CanaryMetricConfig;
 import com.netflix.kayenta.canary.providers.metrics.StackdriverCanaryMetricSetQueryConfig;
@@ -25,11 +25,10 @@ import com.netflix.spectator.api.DefaultRegistry;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.beanutils.PropertyUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -55,47 +54,40 @@ public class StackdriverMetricsServiceTest {
 
   @Test
   void readsInt64Metrics() throws IOException {
-    GoogleNamedAccountCredentials stackdriverCredentialsMock =
-        mock(GoogleNamedAccountCredentials.class);
+    GoogleNamedAccountCredentials stackdriverCredentialsMock = new GoogleNamedAccountCredentials();
+    stackdriverCredentialsMock.setMonitoring(
+        mock(MetricServiceClient.class, Mockito.RETURNS_DEEP_STUBS));
+
     when(accountCredentialsRepoMock.getRequiredOne(ACCOUNT)).thenReturn(stackdriverCredentialsMock);
 
-    Monitoring monitoringMock = mock(Monitoring.class, Mockito.RETURNS_DEEP_STUBS);
-    when(stackdriverCredentialsMock.getMonitoring()).thenReturn(monitoringMock);
-
-    Monitoring.Projects.TimeSeries.List timeSeriesListMock =
-        mock(Monitoring.Projects.TimeSeries.List.class);
-
-    when(monitoringMock
-            .projects()
-            .timeSeries()
-            .list(anyString())
-            .setAggregationAlignmentPeriod(anyString())
-            .setAggregationCrossSeriesReducer(anyString())
-            .setAggregationPerSeriesAligner(anyString())
-            .setFilter(anyString())
-            .setIntervalStartTime(anyString())
-            .setIntervalEndTime(anyString()))
-        .thenReturn(timeSeriesListMock);
-
-    ListTimeSeriesResponse responseMock = mock(ListTimeSeriesResponse.class);
-    when(timeSeriesListMock.execute()).thenReturn(responseMock);
-
-    List<TimeSeries> timeSeriesListWithInt64Points = new ArrayList<TimeSeries>();
-
     // Create a time series with INT64 points
-    List<Point> int64Points = new ArrayList<Point>();
+    List<Point> int64Points = new ArrayList<>();
     int64Points.add(
-        new Point()
-            .setValue(new TypedValue().setInt64Value((Long) 64l))
+        Point.newBuilder()
+            .setValue(TypedValue.newBuilder().setInt64Value(64l).build())
             .setInterval(
-                new TimeInterval()
-                    .setStartTime("1970-01-01T00:00:00.00Z")
-                    .setEndTime("1970-01-01T00:00:01.00Z")));
-    TimeSeries timeSeriesWithInt64Points =
-        new TimeSeries().setValueType("INT64").setPoints(int64Points);
-    timeSeriesListWithInt64Points.add(timeSeriesWithInt64Points);
+                TimeInterval.newBuilder()
+                    .setStartTime(
+                        Timestamp.newBuilder()
+                            .setSeconds(Instant.parse("1970-01-01T00:00:00.00Z").getEpochSecond())
+                            .build())
+                    .setEndTime(
+                        Timestamp.newBuilder()
+                            .setSeconds(Instant.parse("1970-01-01T00:00:01.00Z").getEpochSecond())
+                            .build())
+                    .build())
+            .build());
+    List<TimeSeries> timeSeries =
+        List.of(
+            TimeSeries.newBuilder()
+                .setValueType(MetricDescriptor.ValueType.INT64)
+                .addAllPoints(int64Points)
+                .build());
 
-    when(responseMock.getTimeSeries()).thenReturn(timeSeriesListWithInt64Points);
+    ListTimeSeriesResponse timeSeriesListMock =
+        ListTimeSeriesResponse.newBuilder().addAllTimeSeries(timeSeries).build();
+    when(stackdriverCredentialsMock.getMonitoring().listTimeSeriesCallable().call(any()))
+        .thenReturn(timeSeriesListMock);
 
     CanaryConfig canaryConfig = new CanaryConfig();
     CanaryMetricConfig canaryMetricConfig =
@@ -114,73 +106,56 @@ public class StackdriverMetricsServiceTest {
     List<MetricSet> queriedMetrics =
         stackdriverMetricsService.queryMetrics(
             ACCOUNT, canaryConfig, canaryMetricConfig, canaryScope);
-
+    System.out.println(queriedMetrics.get(0).getValues());
     assertThat(queriedMetrics.get(0).getValues()).contains(64d);
   }
 
   @Test
-  void returnsSingleMetricDescriptorInCache() throws IOException {
+  void returnsSingleMetricDescriptorInCache() throws Exception {
     GoogleNamedAccountCredentials googleAccountCredentialsMock =
-        mock(GoogleNamedAccountCredentials.class, Mockito.RETURNS_DEEP_STUBS);
-
-    Set<AccountCredentials> accountCredentialsSetMock = new HashSet<>();
-    accountCredentialsSetMock.add(googleAccountCredentialsMock);
+        new GoogleNamedAccountCredentials();
+    googleAccountCredentialsMock.setName(ACCOUNT);
+    mock(GoogleNamedAccountCredentials.class, Mockito.RETURNS_DEEP_STUBS);
+    MetricServiceClient monitoringMock =
+        mock(MetricServiceClient.class, Mockito.RETURNS_DEEP_STUBS);
+    googleAccountCredentialsMock.setMonitoring(monitoringMock);
 
     when(accountCredentialsRepoMock.getAllOf(AccountCredentials.Type.METRICS_STORE))
-        .thenReturn(accountCredentialsSetMock);
+        .thenReturn(Set.of(googleAccountCredentialsMock));
 
-    ListMetricDescriptorsResponse listMetricDescriptorsResponseMock =
-        mock(ListMetricDescriptorsResponse.class);
-    when(googleAccountCredentialsMock
-            .getMonitoring()
-            .projects()
-            .metricDescriptors()
-            .list(anyString())
-            .execute())
-        .thenReturn(listMetricDescriptorsResponseMock);
-
-    List<MetricDescriptor> metricDesciprtorMockList = new ArrayList<MetricDescriptor>();
-
-    MetricDescriptor exampleMetricDescriptor = new MetricDescriptor();
-    metricDesciprtorMockList.add(exampleMetricDescriptor);
-    when(listMetricDescriptorsResponseMock.getMetricDescriptors())
+    // https://docs.cloud.google.com/java/docs/reference/google-cloud-monitoring/latest/com.google.monitoring.v3.ListTimeSeriesRequest.Builder#com_google_monitoring_v3_ListTimeSeriesRequest_Builder_setNameBytes_com_google_protobuf_ByteString_
+    // The format is:
+    //
+    // projects/[PROJECT_ID_OR_NUMBER] organizations/[ORGANIZATION_ID] folders/[FOLDER_ID]
+    MetricDescriptor metricDescriptor =
+        MetricDescriptor.newBuilder().setName("project/" + ACCOUNT).build();
+    List<MetricDescriptor> metricDesciprtorMockList = List.of(metricDescriptor);
+    when(monitoringMock.listMetricDescriptorsCallable().call(any()).getMetricDescriptorsList())
         .thenReturn(metricDesciprtorMockList);
 
     stackdriverMetricsService.updateMetricDescriptorsCache();
 
-    List<Map> metadata = stackdriverMetricsService.getMetadata(ACCOUNT, "");
-
-    assertThat(metadata).containsOnly(exampleMetricDescriptor);
+    List<Map<String, ?>> metadata = stackdriverMetricsService.getMetadata(ACCOUNT, "");
+    assertThat(metadata).hasSize(1);
+    assertThat(metadata.get(0)).isEqualTo(PropertyUtils.describe(metricDescriptor));
   }
 
   @Test
   void handlesEmptyResponse() throws IOException {
-    GoogleNamedAccountCredentials stackdriverCredentialsMock =
-        mock(GoogleNamedAccountCredentials.class);
-    when(accountCredentialsRepoMock.getRequiredOne(ACCOUNT)).thenReturn(stackdriverCredentialsMock);
+    GoogleNamedAccountCredentials googleAccountCredentialsMock =
+        new GoogleNamedAccountCredentials();
+    googleAccountCredentialsMock.setName(ACCOUNT);
+    mock(GoogleNamedAccountCredentials.class, Mockito.RETURNS_DEEP_STUBS);
+    MetricServiceClient monitoringMock =
+        mock(MetricServiceClient.class, Mockito.RETURNS_DEEP_STUBS);
+    googleAccountCredentialsMock.setMonitoring(monitoringMock);
 
-    Monitoring monitoringMock = mock(Monitoring.class, Mockito.RETURNS_DEEP_STUBS);
-    when(stackdriverCredentialsMock.getMonitoring()).thenReturn(monitoringMock);
+    when(accountCredentialsRepoMock.getRequiredOne(ACCOUNT))
+        .thenReturn(googleAccountCredentialsMock);
 
-    Monitoring.Projects.TimeSeries.List timeSeriesListMock =
-        mock(Monitoring.Projects.TimeSeries.List.class);
-    when(monitoringMock
-            .projects()
-            .timeSeries()
-            .list(anyString())
-            .setAggregationAlignmentPeriod(anyString())
-            .setAggregationCrossSeriesReducer(anyString())
-            .setAggregationPerSeriesAligner(anyString())
-            .setFilter(anyString())
-            .setIntervalStartTime(anyString())
-            .setIntervalEndTime(anyString()))
-        .thenReturn(timeSeriesListMock);
-
-    ListTimeSeriesResponse responseMock = mock(ListTimeSeriesResponse.class);
-    when(timeSeriesListMock.execute()).thenReturn(responseMock);
-
+    ListTimeSeriesResponse timeSeriesListMock = ListTimeSeriesResponse.newBuilder().build();
+    when(monitoringMock.listTimeSeriesCallable().call(any())).thenReturn(timeSeriesListMock);
     // Return an empty list for time series
-    when(responseMock.getTimeSeries()).thenReturn(Collections.emptyList());
 
     CanaryConfig canaryConfig = new CanaryConfig();
     CanaryMetricConfig canaryMetricConfig =
@@ -207,46 +182,44 @@ public class StackdriverMetricsServiceTest {
 
   @Test
   void handlesInvalidMetricType() throws IOException {
-    GoogleNamedAccountCredentials stackdriverCredentialsMock =
-        mock(GoogleNamedAccountCredentials.class);
-    when(accountCredentialsRepoMock.getRequiredOne(ACCOUNT)).thenReturn(stackdriverCredentialsMock);
-
-    Monitoring monitoringMock = mock(Monitoring.class, Mockito.RETURNS_DEEP_STUBS);
-    when(stackdriverCredentialsMock.getMonitoring()).thenReturn(monitoringMock);
-
-    Monitoring.Projects.TimeSeries.List timeSeriesListMock =
-        mock(Monitoring.Projects.TimeSeries.List.class);
-    when(monitoringMock
-            .projects()
-            .timeSeries()
-            .list(anyString())
-            .setAggregationAlignmentPeriod(anyString())
-            .setAggregationCrossSeriesReducer(anyString())
-            .setAggregationPerSeriesAligner(anyString())
-            .setFilter(anyString())
-            .setIntervalStartTime(anyString())
-            .setIntervalEndTime(anyString()))
-        .thenReturn(timeSeriesListMock);
-
-    ListTimeSeriesResponse responseMock = mock(ListTimeSeriesResponse.class);
-    when(timeSeriesListMock.execute()).thenReturn(responseMock);
-
-    List<TimeSeries> timeSeriesListWithInvalidMetricType = new ArrayList<>();
+    GoogleNamedAccountCredentials googleAccountCredentialsMock =
+        new GoogleNamedAccountCredentials();
+    googleAccountCredentialsMock.setName(ACCOUNT);
+    googleAccountCredentialsMock.setMonitoring(
+        mock(MetricServiceClient.class, Mockito.RETURNS_DEEP_STUBS));
+    when(accountCredentialsRepoMock.getRequiredOne(ACCOUNT))
+        .thenReturn(googleAccountCredentialsMock);
 
     // Create a time series with an invalid metric type
     List<Point> points = new ArrayList<>();
     points.add(
-        new Point()
-            .setValue(new TypedValue().setDoubleValue(3.14))
+        Point.newBuilder()
+            .setValue(TypedValue.newBuilder().setDoubleValue(3.14).build())
             .setInterval(
-                new TimeInterval()
-                    .setStartTime("1970-01-01T00:00:00.00Z")
-                    .setEndTime("1970-01-01T00:00:01.00Z")));
-    TimeSeries timeSeriesWithInvalidMetricType =
-        new TimeSeries().setValueType("STRING").setPoints(points);
-    timeSeriesListWithInvalidMetricType.add(timeSeriesWithInvalidMetricType);
+                TimeInterval.newBuilder()
+                    .setStartTime(
+                        Timestamp.newBuilder()
+                            .setSeconds(Instant.parse("1970-01-01T00:00:00.00Z").getEpochSecond())
+                            .build())
+                    .setEndTime(
+                        Timestamp.newBuilder()
+                            .setSeconds(Instant.parse("1970-01-01T00:00:01.00Z").getEpochSecond())
+                            .build())
+                    .build())
+            .build());
 
-    when(responseMock.getTimeSeries()).thenReturn(timeSeriesListWithInvalidMetricType);
+    List<TimeSeries> timeSeriesListWithInvalidMetricType = new ArrayList<>();
+    timeSeriesListWithInvalidMetricType.add(
+        TimeSeries.newBuilder()
+            .setValueType(MetricDescriptor.ValueType.STRING)
+            .addAllPoints(points)
+            .build());
+    ListTimeSeriesResponse timeSeriesListMock =
+        ListTimeSeriesResponse.newBuilder()
+            .addAllTimeSeries(timeSeriesListWithInvalidMetricType)
+            .build();
+    when(googleAccountCredentialsMock.getMonitoring().listTimeSeriesCallable().call(any()))
+        .thenReturn(timeSeriesListMock);
 
     CanaryConfig canaryConfig = new CanaryConfig();
     CanaryMetricConfig canaryMetricConfig =

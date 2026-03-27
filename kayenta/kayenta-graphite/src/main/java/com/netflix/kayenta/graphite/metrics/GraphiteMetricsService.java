@@ -139,7 +139,8 @@ public class GraphiteMetricsService implements MetricsService {
 
   // TODO: in case of performance issue when there are lots of users, we could cache last responses
   @Override
-  public List<Map> getMetadata(String metricsAccountName, String filter) throws IOException {
+  public List<Map<String, ?>> getMetadata(String metricsAccountName, String filter)
+      throws IOException {
     log.debug(String.format("Getting metadata for %s with filter %s", metricsAccountName, filter));
 
     String baseFilter = "";
@@ -147,7 +148,7 @@ public class GraphiteMetricsService implements MetricsService {
       baseFilter = filter.substring(0, filter.lastIndexOf(DELIMITER) + 1);
     }
 
-    List<Map> result = new LinkedList<>();
+    List<Map<String, ?>> result = new LinkedList<>();
 
     boolean needSpecialDescriptors =
         filter.contains(DELIMITER) && filter.substring(filter.lastIndexOf(DELIMITER)).contains("$");
@@ -189,7 +190,7 @@ public class GraphiteMetricsService implements MetricsService {
     return result;
   }
 
-  private List<Map> getSpecialMetricDescriptors(String baseFilter) {
+  private List<Map<String, ?>> getSpecialMetricDescriptors(String baseFilter) {
     return Arrays.asList(
         new GraphiteMetricDescriptor(baseFilter + SCOPE_VARIABLE).getMap(),
         new GraphiteMetricDescriptor(baseFilter + LOCATION_VARIABLE).getMap());

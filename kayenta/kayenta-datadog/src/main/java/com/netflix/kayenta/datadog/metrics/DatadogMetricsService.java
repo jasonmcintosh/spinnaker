@@ -159,7 +159,7 @@ public class DatadogMetricsService implements MetricsService {
   }
 
   @Override
-  public List<Map> getMetadata(String metricsAccountName, String filter) {
+  public List<Map<String, ?>> getMetadata(String metricsAccountName, String filter) {
     if (!StringUtils.isEmpty(filter)) {
       String lowerCaseFilter = filter.toLowerCase();
 
