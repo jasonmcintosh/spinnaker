@@ -39,7 +39,9 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 @SpringBootTest(
-    classes = BaseControllerTest.TestControllersConfiguration.class,
+    classes = {
+      BaseControllerTest.TestControllersConfiguration.class,
+    },
     webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ExtendWith(SpringExtension.class)
 public abstract class BaseControllerTest {
