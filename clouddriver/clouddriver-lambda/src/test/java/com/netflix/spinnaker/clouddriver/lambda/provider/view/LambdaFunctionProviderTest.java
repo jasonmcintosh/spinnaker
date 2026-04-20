@@ -48,25 +48,36 @@ class LambdaFunctionProviderTest implements LambdaTestingDefaults {
     String applicationName = "lambdaTest";
     String appKey =
         com.netflix.spinnaker.clouddriver.aws.data.Keys.getApplicationKey(applicationName);
-    String functionKey = "functionKey";
+    String functionKey = "aws:lambdaFunctions:account:region:" + applicationName + "-function";
 
     Cache cache = mock(Cache.class);
     when(cache.get(APPLICATIONS.ns, appKey)).thenReturn(null);
 
-    when(cache.getAll(LAMBDA_FUNCTIONS.ns))
+    String pattern = "aws:lambdaFunctions:*:*:" + applicationName + "*";
+    when(cache.filterIdentifiers(LAMBDA_FUNCTIONS.ns, pattern)).thenReturn(List.of(functionKey));
+
+    when(cache.getAll(LAMBDA_FUNCTIONS.ns, List.of(functionKey)))
         .thenReturn(
             List.of(
                 new DefaultCacheData(
-                    appKey,
-                    ImmutableMap.of("functionName", applicationName + "-" + functionKey),
-                    ImmutableMap.of(LAMBDA_FUNCTIONS.ns, List.of(functionKey)))));
+                    functionKey,
+                    ImmutableMap.of("functionName", applicationName + "-function"),
+                    emptyMap())));
+
+    when(cache.get(LAMBDA_FUNCTIONS.ns, functionKey))
+        .thenReturn(
+            new DefaultCacheData(
+                functionKey,
+                ImmutableMap.of("functionName", applicationName + "-function"),
+                emptyMap()));
 
     Set<Function> applicationFunctions =
         new LambdaFunctionProvider(cache).getApplicationFunctions(applicationName);
 
     assertEquals(1, applicationFunctions.size());
     verify(cache, times(1)).get(APPLICATIONS.ns, appKey);
-    verify(cache, times(1)).getAll(LAMBDA_FUNCTIONS.ns);
-    verify(cache, times(0)).get(LAMBDA_FUNCTIONS.ns, functionKey);
+    verify(cache, times(1)).filterIdentifiers(LAMBDA_FUNCTIONS.ns, pattern);
+    verify(cache, times(1)).getAll(LAMBDA_FUNCTIONS.ns, List.of(functionKey));
+    verify(cache, times(1)).get(LAMBDA_FUNCTIONS.ns, functionKey);
   }
 }
