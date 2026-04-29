@@ -17,8 +17,10 @@
 package com.netflix.spinnaker.clouddriver.lambda.names;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.NonNull;
+import org.springframework.lang.Nullable;
 
 public class LambdaResourceFunction implements LambdaResource {
 
@@ -37,12 +39,12 @@ public class LambdaResourceFunction implements LambdaResource {
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  @NonNull
+  @Nullable
   public Map<String, String> getResourceTags() {
     if (lambdaFunction.get("tags") instanceof Map tagsMap) {
       return tagsMap;
     }
-    return Collections.emptyMap();
+    return null;
   }
 
   @Override

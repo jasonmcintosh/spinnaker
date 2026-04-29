@@ -41,13 +41,10 @@ public class LambdaTagNamer implements NamingStrategy<LambdaResource> {
       LambdaResource description, String applicationName, boolean autoApplyTags) {
     if (autoApplyTags) {
       Moniker moniker = getMoniker(description);
-      if (description.getResourceTags() == null) {
-        description.setResourceTags(new HashMap<>());
-      }
       // Make sure to set the app name REGARDLESS derived value in the case where an app has not
       // previously been set
-      if (!description.getResourceTags().containsKey(LambdaTagNamer.APPLICATION)) {
-        description.getResourceTags().put(LambdaTagNamer.APPLICATION, applicationName);
+      if (moniker.getApp() == null) {
+        moniker.setApp(applicationName);
       }
       applyTags(description, moniker);
     }
@@ -69,6 +66,9 @@ public class LambdaTagNamer implements NamingStrategy<LambdaResource> {
   }
 
   private static void applyTags(LambdaResource resource, Moniker moniker) {
+    if (resource.getResourceTags() == null) {
+      resource.setResourceTags(new HashMap<>());
+    }
     Map<String, String> tags = resource.getResourceTags();
 
     setIfPresent(value -> tags.putIfAbsent(APPLICATION, value), moniker.getApp());
@@ -83,7 +83,7 @@ public class LambdaTagNamer implements NamingStrategy<LambdaResource> {
   }
 
   private static Moniker getMoniker(LambdaResource resource) {
-    Map<String, String> tags = resource.getResourceTags();
+    Map<String, String> tags = resource.getResourceTags() != null ? resource.getResourceTags() : new HashMap<>();
     Moniker.MonikerBuilder builder = Moniker.builder();
 
     String name = resource.getName();
