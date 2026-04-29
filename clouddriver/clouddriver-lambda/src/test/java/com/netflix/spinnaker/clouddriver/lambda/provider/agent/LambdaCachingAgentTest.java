@@ -32,7 +32,6 @@ import com.netflix.spinnaker.clouddriver.aws.security.AmazonClientProvider;
 import com.netflix.spinnaker.clouddriver.aws.security.NetflixAmazonCredentials;
 import com.netflix.spinnaker.clouddriver.core.limits.ServiceLimitConfiguration;
 import com.netflix.spinnaker.clouddriver.lambda.cache.Keys;
-import com.netflix.spinnaker.clouddriver.lambda.names.LambdaTagNamer;
 import com.netflix.spinnaker.clouddriver.lambda.service.LambdaService;
 import com.netflix.spinnaker.config.LambdaServiceConfig;
 import java.util.Collection;
@@ -69,12 +68,12 @@ public class LambdaCachingAgentTest {
             netflixAmazonCredentials,
             REGION,
             config,
-            serviceLimitConfiguration,
-            new LambdaTagNamer());
+            serviceLimitConfiguration);
   }
 
   @Test
   public void shouldGetAuthoritativeNames() {
+    when(netflixAmazonCredentials.getName()).thenReturn("test-account");
     Collection<String> authoritativeNames = lambdaCachingAgent.getAuthoritativeKeyNames();
     assertThat(authoritativeNames.size()).isEqualTo(2);
     assertThat(authoritativeNames.contains("lambdaFunctions")).isTrue();
@@ -186,8 +185,7 @@ public class LambdaCachingAgentTest {
             .sorted(Comparator.comparing(CacheData::getId))
             .toList();
     assertThat(applicationsToCache.get(0).getId()).isEqualTo("aws:lambdaApplications:appname2");
-    assertThat(applicationsToCache.get(1).getId())
-        .isEqualTo("aws:lambdaApplications:my-custom-application");
+    assertThat(applicationsToCache.get(1).getId()).isEqualTo("aws:lambdaApplications:my-custom-application");
     assertThat(applicationsToCache.get(1).getAttributes())
         // NOTE:  Careful if this changes - there's a LambdaApplicationProvider that reads these
         // attributes
