@@ -51,7 +51,6 @@ import com.netflix.spinnaker.clouddriver.lambda.names.LambdaResource;
 import com.netflix.spinnaker.clouddriver.lambda.names.LambdaResourceFunction;
 import com.netflix.spinnaker.clouddriver.lambda.names.LambdaTagNamer;
 import com.netflix.spinnaker.clouddriver.lambda.service.LambdaService;
-import com.netflix.spinnaker.clouddriver.names.NamerRegistry;
 import com.netflix.spinnaker.config.LambdaServiceConfig;
 import com.netflix.spinnaker.kork.exceptions.SpinnakerException;
 import com.netflix.spinnaker.moniker.Moniker;

@@ -16,10 +16,7 @@
 
 package com.netflix.spinnaker.clouddriver.lambda.names;
 
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
-import lombok.NonNull;
 import org.springframework.lang.Nullable;
 
 public class LambdaResourceFunction implements LambdaResource {

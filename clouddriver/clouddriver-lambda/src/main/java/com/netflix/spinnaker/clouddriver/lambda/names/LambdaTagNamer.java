@@ -83,7 +83,8 @@ public class LambdaTagNamer implements NamingStrategy<LambdaResource> {
   }
 
   private static Moniker getMoniker(LambdaResource resource) {
-    Map<String, String> tags = resource.getResourceTags() != null ? resource.getResourceTags() : new HashMap<>();
+    Map<String, String> tags =
+        resource.getResourceTags() != null ? resource.getResourceTags() : new HashMap<>();
     Moniker.MonikerBuilder builder = Moniker.builder();
 
     String name = resource.getName();

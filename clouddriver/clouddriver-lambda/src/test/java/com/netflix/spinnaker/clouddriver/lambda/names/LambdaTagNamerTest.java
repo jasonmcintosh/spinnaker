@@ -21,8 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.netflix.spinnaker.moniker.Moniker;
 import java.util.HashMap;
 import java.util.Map;
-
-import kotlin.jvm.internal.Lambda;
 import org.junit.jupiter.api.Test;
 
 public class LambdaTagNamerTest {
@@ -126,11 +124,11 @@ public class LambdaTagNamerTest {
     LambdaTagNamer.applyIfNeeded(function, "appName", true);
     assertThat(function.getResourceTags().get(LambdaTagNamer.APPLICATION)).isEqualTo("appName");
   }
+
   @Test
   void applyMonikerWorks() {
     LambdaResourceFunction function = new LambdaResourceFunction(new HashMap<>());
     new LambdaTagNamer().applyMoniker(function, Moniker.builder().app("appName").build());
     assertThat(function.getResourceTags().get(LambdaTagNamer.APPLICATION)).isEqualTo("appName");
   }
-
 }

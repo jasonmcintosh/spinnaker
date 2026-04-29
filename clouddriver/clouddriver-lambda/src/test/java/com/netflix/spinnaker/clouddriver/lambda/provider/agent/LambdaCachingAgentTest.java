@@ -185,7 +185,8 @@ public class LambdaCachingAgentTest {
             .sorted(Comparator.comparing(CacheData::getId))
             .toList();
     assertThat(applicationsToCache.get(0).getId()).isEqualTo("aws:lambdaApplications:appname2");
-    assertThat(applicationsToCache.get(1).getId()).isEqualTo("aws:lambdaApplications:my-custom-application");
+    assertThat(applicationsToCache.get(1).getId())
+        .isEqualTo("aws:lambdaApplications:my-custom-application");
     assertThat(applicationsToCache.get(1).getAttributes())
         // NOTE:  Careful if this changes - there's a LambdaApplicationProvider that reads these
         // attributes
