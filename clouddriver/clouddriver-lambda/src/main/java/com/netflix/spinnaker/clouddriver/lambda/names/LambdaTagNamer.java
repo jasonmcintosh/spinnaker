@@ -43,9 +43,7 @@ public class LambdaTagNamer implements NamingStrategy<LambdaResource> {
       Moniker moniker = getMoniker(description);
       // Make sure to set the app name REGARDLESS derived value in the case where an app has not
       // previously been set
-      if (moniker.getApp() == null) {
-        moniker.setApp(applicationName);
-      }
+      moniker.setApp(applicationName);
       applyTags(description, moniker);
     }
   }
