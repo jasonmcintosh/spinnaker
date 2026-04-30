@@ -70,31 +70,21 @@ public class LambdaResourceFunctionTest {
   }
 
   @Test
-  public void shouldReturnEmptyMapWhenTagsNotSet() {
+  public void shouldReturnNullWhenTagsNotSet() {
     Map<String, Object> function = new HashMap<>();
 
     LambdaResourceFunction resource = new LambdaResourceFunction(function);
 
-    assertThat(resource.getResourceTags()).isEmpty();
+    assertThat(resource.getResourceTags()).isNull();
   }
 
   @Test
-  public void shouldReturnEmptyMapWhenTagsIsNotAMap() {
+  public void shouldReturnNullWhenTagsIsNotAMap() {
     Map<String, Object> function = new HashMap<>();
     function.put("tags", "not-a-map");
 
     LambdaResourceFunction resource = new LambdaResourceFunction(function);
 
-    assertThat(resource.getResourceTags()).isEmpty();
-  }
-
-  @Test
-  public void shouldReturnEmptyMapWhenTagsIsNull() {
-    Map<String, Object> function = new HashMap<>();
-    function.put("tags", null);
-
-    LambdaResourceFunction resource = new LambdaResourceFunction(function);
-
-    assertThat(resource.getResourceTags()).isEmpty();
+    assertThat(resource.getResourceTags()).isNull();
   }
 }
