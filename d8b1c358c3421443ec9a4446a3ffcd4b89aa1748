@@ -1,0 +1,54 @@
+kork/kork-core/src/test/java/com/netflix/spinnaker/kork/yaml/YamlHelperInjectionTest.java
+  human 84-85,102,112,115,122-123,160,174-175,196-197,263,275-276
+kork/kork-core/src/main/java/com/netflix/spinnaker/kork/yaml/YamlHelper.java
+  human 69-71
+---
+{
+  "attestations": [
+    {
+      "entries": [
+        {
+          "accepted_lines": 15,
+          "added_lines": 15,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "84-85,102,112,115,122-123,160,174-175,196-197,263,275-276",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "kork/kork-core/src/test/java/com/netflix/spinnaker/kork/yaml/YamlHelperInjectionTest.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 3,
+          "added_lines": 3,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "69-71",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "kork/kork-core/src/main/java/com/netflix/spinnaker/kork/yaml/YamlHelper.java"
+    }
+  ],
+  "base_commit_sha": "078cd220ec3f5506b5c714c85355e20671b2668d",
+  "branch": "fixNotUsingSafeConstructor",
+  "commit_sha": "d8b1c358c3421443ec9a4446a3ffcd4b89aa1748",
+  "commit_time": "2026-05-06T14:21:38-05:00",
+  "commit_type": "direct_commit",
+  "git_ai_version": "1.4.2",
+  "prompts": {
+    "human": {
+      "accepted_lines": 18,
+      "agent_id": null,
+      "human_author": "Jason McIntosh <jason.mcintosh@harness.io>",
+      "messages": [],
+      "overriden_lines": 0,
+      "total_additions": 18,
+      "total_deletions": 0
+    }
+  },
+  "repo": "git@github.com:spinnaker/spinnaker.git",
+  "schema_version": "authorship/3.0.0"
+}
