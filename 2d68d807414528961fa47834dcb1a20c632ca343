@@ -1,0 +1,219 @@
+clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/AbstractEcsCachingAgent.java
+  human 111-116,124,127-132,164-167,172-175
+clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/IamRoleCachingAgent.java
+  human 91-93
+clouddriver/clouddriver-cloudfoundry/src/main/java/com/netflix/spinnaker/clouddriver/cloudfoundry/model/CloudFoundryCluster.java
+  human 32,49
+clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/SecretCachingAgent.java
+  human 85-87
+clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/cache/Keys.java
+  human 26,29,55-77
+clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/ServiceDiscoveryCachingAgent.java
+  human 87-90
+clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/ScalableTargetsCachingAgent.java
+  human 95-98,113-115
+clouddriver/clouddriver-api/src/main/java/com/netflix/spinnaker/cats/cache/Cache.java
+  human 92-94,99,104-107
+clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/cache/client/AbstractCacheClient.java
+  human 101-103
+clouddriver/cats/cats-sql/src/main/kotlin/com/netflix/spinnaker/cats/sql/cache/SqlCache.kt
+  human 1065-1095
+clouddriver/clouddriver-cloudfoundry/src/main/java/com/netflix/spinnaker/clouddriver/cloudfoundry/controller/CloudFoundryImageController.java
+  human 45
+clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/cache/client/IamRoleCacheClient.java
+  human 95-97
+clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/EcsCloudMetricAlarmCachingAgent.java
+  human 94-96
+---
+{
+  "attestations": [
+    {
+      "entries": [
+        {
+          "accepted_lines": 21,
+          "added_lines": 21,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "111-116,124,127-132,164-167,172-175",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/AbstractEcsCachingAgent.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 3,
+          "added_lines": 3,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "91-93",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/IamRoleCachingAgent.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 2,
+          "added_lines": 2,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "32,49",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-cloudfoundry/src/main/java/com/netflix/spinnaker/clouddriver/cloudfoundry/model/CloudFoundryCluster.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 3,
+          "added_lines": 3,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "85-87",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/SecretCachingAgent.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 25,
+          "added_lines": 25,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "26,29,55-77",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/cache/Keys.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 4,
+          "added_lines": 4,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "87-90",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/ServiceDiscoveryCachingAgent.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 7,
+          "added_lines": 7,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "95-98,113-115",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/ScalableTargetsCachingAgent.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 8,
+          "added_lines": 8,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "92-94,99,104-107",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-api/src/main/java/com/netflix/spinnaker/cats/cache/Cache.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 3,
+          "added_lines": 3,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "101-103",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/cache/client/AbstractCacheClient.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 31,
+          "added_lines": 31,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "1065-1095",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/cats/cats-sql/src/main/kotlin/com/netflix/spinnaker/cats/sql/cache/SqlCache.kt"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 1,
+          "added_lines": 1,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "45",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-cloudfoundry/src/main/java/com/netflix/spinnaker/clouddriver/cloudfoundry/controller/CloudFoundryImageController.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 3,
+          "added_lines": 3,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "95-97",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/cache/client/IamRoleCacheClient.java"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 3,
+          "added_lines": 3,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "94-96",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "clouddriver/clouddriver-ecs/src/main/java/com/netflix/spinnaker/clouddriver/ecs/provider/agent/EcsCloudMetricAlarmCachingAgent.java"
+    }
+  ],
+  "base_commit_sha": "bd3df2e853a63550ee4420ad689d433fe8878345",
+  "branch": "fixEcsCachingAgentLoadingAllData",
+  "commit_sha": "2d68d807414528961fa47834dcb1a20c632ca343",
+  "commit_time": "2026-05-07T15:57:25-05:00",
+  "commit_type": "direct_commit",
+  "git_ai_version": "1.4.2",
+  "prompts": {
+    "human": {
+      "accepted_lines": 114,
+      "agent_id": null,
+      "human_author": "Jason McIntosh <jason.mcintosh@harness.io>",
+      "messages": [],
+      "overriden_lines": 0,
+      "total_additions": 114,
+      "total_deletions": 0
+    }
+  },
+  "repo": "git@github.com:spinnaker/spinnaker.git",
+  "schema_version": "authorship/3.0.0"
+}
