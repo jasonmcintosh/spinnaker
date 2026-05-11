@@ -1,0 +1,224 @@
+keel/gradle.properties
+  764c5e1a-72da-4788-b382-b7eb29c8f677 4
+keel/keel-sql/keel-sql.gradle
+  764c5e1a-72da-4788-b382-b7eb29c8f677 3-6,52-53,59,63-65,75-83,94-97
+keel/build.gradle
+  764c5e1a-72da-4788-b382-b7eb29c8f677 77-82
+  human 9,66
+spinnaker-gradle-project/spinnaker-project-plugin/src/main/groovy/com/netflix/spinnaker/gradle/baseproject/SpinnakerBaseProjectPlugin.groovy
+  human 3
+deck/build.gradle
+  human 9-10
+spinnaker-gradle-project/spinnaker-project-plugin/build.gradle
+  human 6,8
+echo/Dockerfile.compile
+  human 8
+rosco/Dockerfile.compile
+  human 8
+orca/Dockerfile.compile
+  human 8
+gradle/wrapper/gradle-wrapper.properties
+  human 3
+spinnaker-gradle-project/spinnaker-project-plugin/src/main/groovy/com/netflix/spinnaker/gradle/baseproject/SpinnakerBaseProjectConventionsPlugin.groovy
+  human 11,25-28,30-31,35
+spinnaker-gradle-project/spinnaker-project-plugin/src/main/groovy/com/netflix/spinnaker/gradle/codestyle/SpinnakerCodeStylePlugin.groovy
+  human 110
+---
+{
+  "attestations": [
+    {
+      "entries": [
+        {
+          "accepted_lines": 1,
+          "added_lines": 1,
+          "deleted_lines": 0,
+          "hash": "764c5e1a-72da-4788-b382-b7eb29c8f677",
+          "lines": "4",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "keel/gradle.properties"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 23,
+          "added_lines": 24,
+          "deleted_lines": 21,
+          "hash": "764c5e1a-72da-4788-b382-b7eb29c8f677",
+          "lines": "3-6,52-53,59,63-65,75-83,94-97",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "keel/keel-sql/keel-sql.gradle"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 6,
+          "added_lines": 6,
+          "deleted_lines": 7,
+          "hash": "764c5e1a-72da-4788-b382-b7eb29c8f677",
+          "lines": "77-82",
+          "overridden_lines": 0
+        },
+        {
+          "accepted_lines": 2,
+          "added_lines": 2,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "9,66",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "keel/build.gradle"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 1,
+          "added_lines": 1,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "3",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "spinnaker-gradle-project/spinnaker-project-plugin/src/main/groovy/com/netflix/spinnaker/gradle/baseproject/SpinnakerBaseProjectPlugin.groovy"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 2,
+          "added_lines": 2,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "9-10",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "deck/build.gradle"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 2,
+          "added_lines": 2,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "6,8",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "spinnaker-gradle-project/spinnaker-project-plugin/build.gradle"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 1,
+          "added_lines": 1,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "8",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "echo/Dockerfile.compile"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 1,
+          "added_lines": 1,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "8",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "rosco/Dockerfile.compile"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 1,
+          "added_lines": 1,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "8",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "orca/Dockerfile.compile"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 1,
+          "added_lines": 1,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "3",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "gradle/wrapper/gradle-wrapper.properties"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 8,
+          "added_lines": 8,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "11,25-28,30-31,35",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "spinnaker-gradle-project/spinnaker-project-plugin/src/main/groovy/com/netflix/spinnaker/gradle/baseproject/SpinnakerBaseProjectConventionsPlugin.groovy"
+    },
+    {
+      "entries": [
+        {
+          "accepted_lines": 1,
+          "added_lines": 1,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "110",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "spinnaker-gradle-project/spinnaker-project-plugin/src/main/groovy/com/netflix/spinnaker/gradle/codestyle/SpinnakerCodeStylePlugin.groovy"
+    }
+  ],
+  "base_commit_sha": "2d39bc811828d4d864e78c31b10abb1d7a31d0ce",
+  "branch": "gradle8Upgrade",
+  "commit_sha": "e367ed42a15a29c725e49574a42904219c797b90",
+  "commit_time": "2026-05-10T21:23:07-05:00",
+  "commit_type": "direct_commit",
+  "git_ai_version": "1.4.3",
+  "prompts": {
+    "764c5e1a-72da-4788-b382-b7eb29c8f677": {
+      "accepted_lines": 30,
+      "agent_id": {
+        "id": "764c5e1a-72da-4788-b382-b7eb29c8f677",
+        "model": "claude-sonnet-4-5-20250929",
+        "tool": "claude"
+      },
+      "human_author": "Jason McIntosh <jason.mcintosh@harness.io>",
+      "overriden_lines": 0,
+      "total_additions": 31,
+      "total_deletions": 28
+    },
+    "human": {
+      "accepted_lines": 20,
+      "agent_id": null,
+      "human_author": "Jason McIntosh <jason.mcintosh@harness.io>",
+      "overriden_lines": 0,
+      "total_additions": 20,
+      "total_deletions": 0
+    }
+  },
+  "repo": "git@github.com:spinnaker/spinnaker.git",
+  "schema_version": "authorship/3.0.0"
+}
