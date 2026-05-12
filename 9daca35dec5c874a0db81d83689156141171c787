@@ -1,0 +1,13 @@
+---
+{
+  "attestations": [],
+  "base_commit_sha": "183b6bd7b2e078bd5683337538d1d29a04b5fd3c",
+  "branch": "removeBearyChat",
+  "commit_sha": "9daca35dec5c874a0db81d83689156141171c787",
+  "commit_time": "2026-05-11T22:20:39-05:00",
+  "commit_type": "direct_commit",
+  "git_ai_version": "1.4.4",
+  "prompts": {},
+  "repo": "git@github.com:jasonmcintosh/spinnaker.git",
+  "schema_version": "authorship/3.0.0"
+}
