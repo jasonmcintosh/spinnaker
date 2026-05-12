@@ -1,0 +1,38 @@
+front50/front50-core/src/main/java/com/netflix/spinnaker/front50/model/notification/NotificationDAO.java
+  human 12
+---
+{
+  "attestations": [
+    {
+      "entries": [
+        {
+          "accepted_lines": 1,
+          "added_lines": 1,
+          "deleted_lines": 0,
+          "hash": "human",
+          "lines": "12",
+          "overridden_lines": 0
+        }
+      ],
+      "file": "front50/front50-core/src/main/java/com/netflix/spinnaker/front50/model/notification/NotificationDAO.java"
+    }
+  ],
+  "base_commit_sha": "23d7a6125e571d2c9b8a28086688cfcbbc134a23",
+  "branch": "removeBearyChat",
+  "commit_sha": "c86e43394811c0ffa34fc6dc034ff168089d7e0b",
+  "commit_time": "2026-05-11T23:18:36-05:00",
+  "commit_type": "rebase",
+  "git_ai_version": "1.4.4",
+  "prompts": {
+    "human": {
+      "accepted_lines": 1,
+      "agent_id": null,
+      "human_author": "Jason McIntosh <jason.mcintosh@harness.io>",
+      "overriden_lines": 0,
+      "total_additions": 1,
+      "total_deletions": 0
+    }
+  },
+  "repo": "git@github.com:jasonmcintosh/spinnaker.git",
+  "schema_version": "authorship/3.0.0"
+}
