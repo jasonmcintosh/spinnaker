@@ -16,11 +16,13 @@
 
 package com.netflix.spinnaker.rosco.manifests.kustomize;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.collect.ImmutableList;
 import com.netflix.spinnaker.kork.artifacts.model.Artifact;
 import com.netflix.spinnaker.kork.core.RetrySupport;
 import com.netflix.spinnaker.kork.retrofit.Retrofit2SyncCall;
-import com.netflix.spinnaker.kork.yaml.YamlHelper;
 import com.netflix.spinnaker.rosco.manifests.kustomize.mapping.Kustomization;
 import com.netflix.spinnaker.rosco.services.ClouddriverService;
 import java.io.IOException;
@@ -29,23 +31,23 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.ResponseBody;
 import org.springframework.stereotype.Component;
-import org.yaml.snakeyaml.constructor.Constructor;
-import org.yaml.snakeyaml.representer.Representer;
 
 @Component
 @Slf4j
 public class KustomizationFileReader {
   private final ClouddriverService clouddriverService;
   private final RetrySupport retrySupport = new RetrySupport();
+  private final ObjectMapper yamlObjectMapper;
   private static final List<String> KUSTOMIZATION_FILENAMES =
       ImmutableList.of("kustomization.yaml", "kustomization.yml", "kustomization");
 
   public KustomizationFileReader(ClouddriverService clouddriverService) {
     this.clouddriverService = clouddriverService;
+    this.yamlObjectMapper = new ObjectMapper(new YAMLFactory());
+    this.yamlObjectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
   }
 
   public Kustomization getKustomization(Artifact artifact, String possibleName) {
@@ -56,7 +58,7 @@ public class KustomizationFileReader {
             .sorted(
                 (a, b) ->
                     a.equals(possibleName) ? -1 : (b.equals(possibleName) ? 1 : a.compareTo(b)))
-            .collect(Collectors.toList());
+            .toList();
 
     Kustomization k = null;
     for (String name : names) {
@@ -68,7 +70,10 @@ public class KustomizationFileReader {
         break;
       } catch (Exception e) {
         log.error(
-            "kustomization file {} cannot be found at location", name, artifact.getReference());
+            "kustomization file {} cannot be found at location {}",
+            name,
+            artifact.getReference(),
+            e);
       }
     }
 
@@ -89,10 +94,7 @@ public class KustomizationFileReader {
   }
 
   private Kustomization convert(Artifact artifact) throws IOException {
-    Representer representer = new Representer();
-    representer.getPropertyUtils().setSkipMissingProperties(true);
-    return YamlHelper.newYamlRepresenter(new Constructor(Kustomization.class), representer)
-        .load(downloadFile(artifact));
+    return yamlObjectMapper.readValue(downloadFile(artifact), Kustomization.class);
   }
 
   private InputStream downloadFile(Artifact artifact) throws IOException {

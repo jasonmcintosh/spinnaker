@@ -20,6 +20,7 @@ dependencies {
   implementation("com.netflix.spectator:spectator-api")
   implementation("com.netflix.frigga:frigga")
   implementation("io.spinnaker.kork:kork-exceptions")
+  implementation("io.spinnaker.kork:kork-core")
   implementation("io.spinnaker.kork:kork-retrofit")
   implementation("com.squareup.okhttp3:okhttp")
   implementation("commons-codec:commons-codec")

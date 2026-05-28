@@ -16,7 +16,7 @@
 package com.netflix.spinnaker.orca.pipelinetemplate.v1schema
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.netflix.spectator.api.*
+import com.netflix.spinnaker.kork.yaml.YamlHelper
 import com.netflix.spinnaker.orca.clouddriver.OortService
 import com.netflix.spinnaker.orca.front50.Front50Service
 import com.netflix.spinnaker.orca.jackson.OrcaObjectMapper
@@ -38,8 +38,6 @@ import com.netflix.spinnaker.orca.pipelinetemplate.v1schema.render.Renderer
 import com.netflix.spinnaker.orca.pipelinetemplate.v1schema.render.YamlRenderedValueConverter
 import org.springframework.core.io.Resource
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver
-import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.SafeConstructor
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -96,7 +94,7 @@ class V1SchemaIntegrationSpec extends Specification {
 
   private static class IntegrationTestDataProvider {
 
-    Yaml yaml = new Yaml(new SafeConstructor())
+    JacksonYamlWrapper yaml = YamlHelper.newYamlSafeConstructor()
     ObjectMapper objectMapper = OrcaObjectMapper.newInstance()
 
     List<IntegrationTest> provide() {

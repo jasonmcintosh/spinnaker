@@ -21,16 +21,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.netflix.spinnaker.halyard.config.config.v1.StrictObjectMapper;
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper;
+import com.netflix.spinnaker.kork.yaml.YamlHelper;
 import java.io.IOException;
 import java.io.StringWriter;
 import org.junit.jupiter.api.Test;
-import org.yaml.snakeyaml.Yaml;
 
 final class KubernetesAccountTest {
 
   @Test
   void testLastOAuthScopeIsKept_capitalA() {
-    Yaml yamlParser = new Yaml();
+    JacksonYamlWrapper yamlParser = YamlHelper.newYamlSafeConstructor();
     Object parsedYaml =
         yamlParser.load(
             Joiner.on('\n')
@@ -45,7 +46,7 @@ final class KubernetesAccountTest {
 
   @Test
   void testLastOAuthScopeIsKept_lowercaseA() {
-    Yaml yamlParser = new Yaml();
+    JacksonYamlWrapper yamlParser = YamlHelper.newYamlSafeConstructor();
     Object parsedYaml =
         yamlParser.load(
             Joiner.on('\n')
@@ -60,7 +61,7 @@ final class KubernetesAccountTest {
 
   @Test
   void testLastOAuthServiceAccountIsKept_capitalA() {
-    Yaml yamlParser = new Yaml();
+    JacksonYamlWrapper yamlParser = YamlHelper.newYamlSafeConstructor();
     Object parsedYaml =
         yamlParser.load(
             Joiner.on('\n')
@@ -75,7 +76,7 @@ final class KubernetesAccountTest {
 
   @Test
   void testLastOAuthServiceAccountIsKept_lowercaseA() {
-    Yaml yamlParser = new Yaml();
+    JacksonYamlWrapper yamlParser = YamlHelper.newYamlSafeConstructor();
     Object parsedYaml =
         yamlParser.load(
             Joiner.on('\n')

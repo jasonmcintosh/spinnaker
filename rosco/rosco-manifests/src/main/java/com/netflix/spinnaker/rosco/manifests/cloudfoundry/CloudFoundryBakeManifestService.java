@@ -20,6 +20,7 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.CharStreams;
 import com.netflix.spinnaker.kork.artifacts.model.Artifact;
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper;
 import com.netflix.spinnaker.kork.yaml.YamlHelper;
 import com.netflix.spinnaker.rosco.jobs.JobExecutor;
 import com.netflix.spinnaker.rosco.manifests.ArtifactDownloader;
@@ -42,7 +43,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.yaml.snakeyaml.Yaml;
 
 @Component
 public class CloudFoundryBakeManifestService
@@ -68,7 +68,7 @@ public class CloudFoundryBakeManifestService
   public Artifact bake(CloudFoundryBakeManifestRequest bakeManifestRequest) throws IOException {
     String pattern = "\\(\\((!?[-/\\.\\w\\pL\\]\\[]+)\\)\\)";
 
-    Yaml yaml = YamlHelper.newYamlSafeConstructor();
+    JacksonYamlWrapper yaml = YamlHelper.newYamlSafeConstructor();
 
     String manifestTemplate =
         CharStreams.toString(
@@ -79,7 +79,9 @@ public class CloudFoundryBakeManifestService
     Map<String, Object> vars = new HashMap<>();
     for (Artifact artifact : bakeManifestRequest.getVarsArtifacts()) {
       InputStream inputStream = artifactDownloader.downloadArtifact(artifact);
-      vars.putAll(yaml.load(inputStream));
+      @SuppressWarnings("unchecked")
+      Map<String, Object> loadedVars = (Map<String, Object>) yaml.load(inputStream);
+      vars.putAll(loadedVars);
       inputStream.close();
     }
     vars = flatten(vars);

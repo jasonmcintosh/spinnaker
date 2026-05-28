@@ -21,13 +21,12 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.netflix.spinnaker.clouddriver.artifacts.kubernetes.KubernetesArtifactType
 import com.netflix.spinnaker.clouddriver.kubernetes.description.manifest.KubernetesManifest
 import com.netflix.spinnaker.kork.artifacts.model.Artifact
-import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.SafeConstructor
+import com.netflix.spinnaker.kork.yaml.YamlHelper
 import spock.lang.Specification
 
 class KubernetesDeploymentHandlerSpec extends Specification {
   def objectMapper = new ObjectMapper()
-  def yaml = new Yaml(new SafeConstructor())
+  def yaml = YamlHelper.newYamlSafeConstructor()
   def handler = new KubernetesDeploymentHandler()
 
   def IMAGE = "gcr.io/project/image"

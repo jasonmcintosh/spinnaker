@@ -20,15 +20,23 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.netflix.spinnaker.halyard.config.model.v1.node.*;
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper;
 import com.netflix.spinnaker.kork.yaml.YamlHelper;
 import java.util.List;
 import java.util.Map;
 import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
 
 public class AnsiFormatUtils {
-  private static ThreadLocal<Yaml> yamlParser =
-      ThreadLocal.withInitial(AnsiFormatUtils::getYamlParser);
+  private static final JacksonYamlWrapper yamlHelper;
+
+  static {
+    DumperOptions options = new DumperOptions();
+    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+    options.setDefaultScalarStyle(DumperOptions.ScalarStyle.PLAIN);
+
+    yamlHelper = YamlHelper.newYamlDumperOptions(options);
+  }
+
   private static ObjectMapper objectMapper = null;
 
   public enum Format {
@@ -49,12 +57,8 @@ public class AnsiFormatUtils {
     }
   }
 
-  private static Yaml getYamlParser() {
-    DumperOptions options = new DumperOptions();
-    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-    options.setDefaultScalarStyle(DumperOptions.ScalarStyle.PLAIN);
-
-    return YamlHelper.newYamlDumperOptions(options);
+  private static JacksonYamlWrapper getYamlParser() {
+    return yamlHelper;
   }
 
   private static ObjectMapper getObjectMapper() {
@@ -68,10 +72,10 @@ public class AnsiFormatUtils {
 
   private static String formatYaml(Object yaml) {
     if (yaml instanceof List) {
-      return yamlParser.get().dump(getObjectMapper().convertValue(yaml, List.class));
+      return yamlHelper.dump(getObjectMapper().convertValue(yaml, List.class));
     }
 
-    return yamlParser.get().dump(getObjectMapper().convertValue(yaml, Map.class));
+    return yamlHelper.dump(getObjectMapper().convertValue(yaml, Map.class));
   }
 
   private static String formatJson(Object json) {

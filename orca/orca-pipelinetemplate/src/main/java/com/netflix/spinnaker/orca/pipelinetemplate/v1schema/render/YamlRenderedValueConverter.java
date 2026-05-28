@@ -15,13 +15,13 @@
  */
 package com.netflix.spinnaker.orca.pipelinetemplate.v1schema.render;
 
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper;
 import com.netflix.spinnaker.kork.yaml.YamlHelper;
 import com.netflix.spinnaker.orca.pipelinetemplate.exceptions.TemplateRenderException;
 import java.util.Arrays;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.composer.ComposerException;
 import org.yaml.snakeyaml.parser.ParserException;
 
@@ -31,8 +31,7 @@ public class YamlRenderedValueConverter implements RenderedValueConverter {
 
   private final Logger log = LoggerFactory.getLogger(getClass());
 
-  private static final ThreadLocal<Yaml> yaml =
-      ThreadLocal.withInitial(() -> YamlHelper.newYamlSafeConstructor());
+  private static final JacksonYamlWrapper yaml = YamlHelper.newYamlSafeConstructor();
 
   @Override
   public Object convertRenderedValue(String renderedValue) {
@@ -46,7 +45,7 @@ public class YamlRenderedValueConverter implements RenderedValueConverter {
     }
 
     try {
-      Object converted = yaml.get().load(renderedValue);
+      Object converted = yaml.load(renderedValue);
       if (converted == null || converted instanceof String) {
         return "".equals(converted) || "".equals(renderedValue) ? null : renderedValue;
       }

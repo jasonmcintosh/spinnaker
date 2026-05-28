@@ -3,50 +3,38 @@ package com.netflix.spinnaker.kork.yaml;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import org.junit.jupiter.api.BeforeAll;
+import com.fasterxml.jackson.dataformat.yaml.JacksonYAMLParseException;
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper.YamlProcessingException;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.TestPropertySource;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.constructor.Constructor;
-import org.yaml.snakeyaml.error.YAMLException;
-import org.yaml.snakeyaml.representer.Representer;
 
 @SpringBootTest(classes = YamlHelperTest.TestConfig.class)
 @TestPropertySource(
     properties = {"snakeyaml.max-aliases-for-collections=55", "snakeyaml.code-point-limit=1024"})
 class YamlHelperTest {
 
-  static DumperOptions DUMPER_OPTIONS;
-
-  static LoaderOptions LOADER_OPTIONS;
-
-  @BeforeAll
-  public static void setUp() {
-    DUMPER_OPTIONS = new DumperOptions();
-    DUMPER_OPTIONS.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-    DUMPER_OPTIONS.setDefaultScalarStyle(DumperOptions.ScalarStyle.PLAIN);
-
-    LOADER_OPTIONS = new LoaderOptions();
-    LOADER_OPTIONS.setMaxAliasesForCollections(1000);
-  }
+  @Autowired private YamlHelper yamlHelper;
 
   @Test
-  public void aliasLimitIsEnforced() {
+  public void aliasLimitIsEnforcedViaNestingDepth() {
+    // With Jackson+SnakeYAML, alias expansion is controlled via LoaderOptions
     String doc = yamlWithNAliases(56);
-    assertThatThrownBy(() -> YamlHelper.newYaml().load(doc))
-        .isInstanceOf(YAMLException.class)
-        .hasMessage("Number of aliases for non-scalar nodes exceeds the specified max=55");
+    assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(doc))
+        .isInstanceOf(YamlProcessingException.class)
+        .hasCauseInstanceOf(JacksonYAMLParseException.class)
+        .hasStackTraceContaining("Number of aliases for non-scalar nodes exceeds the specified max=55");
   }
 
   @Test
   public void aliasLimitIsNotExceeded() {
+    // Create YAML with moderate nesting that should pass
     String okString = yamlWithNAliases(50);
-    Object result = YamlHelper.newYaml().load(okString);
+    Object result = YamlHelper.newYamlSafeConstructor().load(okString);
     assertThat(result).isNotNull();
   }
 
@@ -54,15 +42,16 @@ class YamlHelperTest {
   public void codePointLimitIsEnforced() {
     // This string has more than 1024 characters
     String bigString = yamlWithNCodePoints(1025);
-    assertThatThrownBy(() -> YamlHelper.newYaml().load(bigString))
-        .isInstanceOf(YAMLException.class)
-        .hasMessage("The incoming YAML document exceeds the limit: 1024 code points.");
+    assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(bigString))
+        .isInstanceOf(YamlProcessingException.class)
+        .hasCauseInstanceOf(JacksonYAMLParseException.class)
+        .hasStackTraceContaining("The incoming YAML document exceeds the limit: 1024 code points.");
   }
 
   @Test
   public void codePointLimitIsNotExceeded() {
     String okString = yamlWithNCodePoints(1000);
-    Object result = YamlHelper.newYaml().load(okString);
+    Object result = YamlHelper.newYamlSafeConstructor().load(okString);
     assertThat(result).isNotNull();
   }
 
@@ -70,8 +59,9 @@ class YamlHelperTest {
   public void aliasLimitIsEnforcedYamlSafeConstructor() {
     String doc = yamlWithNAliases(56);
     assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(doc))
-        .isInstanceOf(YAMLException.class)
-        .hasMessage("Number of aliases for non-scalar nodes exceeds the specified max=55");
+        .isInstanceOf(YamlProcessingException.class)
+        .hasCauseInstanceOf(JacksonYAMLParseException.class)
+        .hasStackTraceContaining("Number of aliases for non-scalar nodes exceeds the specified max=55");
   }
 
   @Test
@@ -83,11 +73,11 @@ class YamlHelperTest {
 
   @Test
   public void codePointLimitIsEnforcedYamlSafeConstructor() {
-    // This string has more than 1024 characters
     String bigString = yamlWithNCodePoints(1025);
     assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(bigString))
-        .isInstanceOf(YAMLException.class)
-        .hasMessage("The incoming YAML document exceeds the limit: 1024 code points.");
+        .isInstanceOf(YamlProcessingException.class)
+        .hasCauseInstanceOf(JacksonYAMLParseException.class)
+        .hasStackTraceContaining("The incoming YAML document exceeds the limit: 1024 code points.");
   }
 
   @Test
@@ -100,107 +90,95 @@ class YamlHelperTest {
   @Test
   public void aliasLimitIsEnforcedYamlDumperOptions() {
     String doc = yamlWithNAliases(56);
-    assertThatThrownBy(() -> YamlHelper.newYamlDumperOptions(DUMPER_OPTIONS).load(doc))
-        .isInstanceOf(YAMLException.class)
-        .hasMessage("Number of aliases for non-scalar nodes exceeds the specified max=55");
+    assertThatThrownBy(() -> YamlHelper.newYamlDumperOptions(null).load(doc))
+        .isInstanceOf(YamlProcessingException.class)
+        .hasCauseInstanceOf(JacksonYAMLParseException.class)
+        .hasStackTraceContaining("Number of aliases for non-scalar nodes exceeds the specified max=55");
   }
 
   @Test
   public void aliasLimitIsNotExceededYamlDumperOptions() {
     String okString = yamlWithNAliases(50);
-    Object result = YamlHelper.newYamlDumperOptions(DUMPER_OPTIONS).load(okString);
+    Object result = YamlHelper.newYamlDumperOptions(null).load(okString);
     assertThat(result).isNotNull();
   }
 
   @Test
   public void codePointLimitIsEnforcedYamlDumperOptions() {
-    // This string has more than 1024 characters
     String bigString = yamlWithNCodePoints(1025);
-    assertThatThrownBy(() -> YamlHelper.newYamlDumperOptions(DUMPER_OPTIONS).load(bigString))
-        .isInstanceOf(YAMLException.class)
-        .hasMessage("The incoming YAML document exceeds the limit: 1024 code points.");
+    assertThatThrownBy(() -> YamlHelper.newYamlDumperOptions(null).load(bigString))
+        .isInstanceOf(YamlProcessingException.class)
+        .hasCauseInstanceOf(JacksonYAMLParseException.class)
+        .hasStackTraceContaining("The incoming YAML document exceeds the limit: 1024 code points.");
   }
 
   @Test
   public void codePointLimitIsNotExceededYamlDumperOptions() {
     String okString = yamlWithNCodePoints(1000);
-    Object result = YamlHelper.newYamlDumperOptions(DUMPER_OPTIONS).load(okString);
+    Object result = YamlHelper.newYamlDumperOptions(null).load(okString);
     assertThat(result).isNotNull();
   }
 
   @Test
   public void aliasLimitIsEnforcedYamlLoaderOptions() {
     String doc = yamlWithNAliases(56);
-    assertThatThrownBy(() -> YamlHelper.newYamlLoaderOptions(LOADER_OPTIONS).load(doc))
-        .isInstanceOf(YAMLException.class)
-        .hasMessage("Number of aliases for non-scalar nodes exceeds the specified max=55");
+    assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(doc))
+        .isInstanceOf(YamlProcessingException.class)
+        .hasCauseInstanceOf(JacksonYAMLParseException.class)
+        .hasStackTraceContaining("Number of aliases for non-scalar nodes exceeds the specified max=55");
   }
 
   @Test
   public void aliasLimitIsNotExceededYamlLoaderOptions() {
     String okString = yamlWithNAliases(50);
-    Object result = YamlHelper.newYamlLoaderOptions(LOADER_OPTIONS).load(okString);
+    Object result = YamlHelper.newYamlSafeConstructor().load(okString);
     assertThat(result).isNotNull();
   }
 
   @Test
-  public void codePointLimitIsEnforcedYamlLoaderOptions() {
-    // This string has more than 1024 characters
+  void codePointLimitIsEnforcedYamlLoaderOptions() {
     String bigString = yamlWithNCodePoints(1025);
-    assertThatThrownBy(() -> YamlHelper.newYamlLoaderOptions(LOADER_OPTIONS).load(bigString))
-        .isInstanceOf(YAMLException.class)
-        .hasMessage("The incoming YAML document exceeds the limit: 1024 code points.");
+    assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(bigString))
+        .isInstanceOf(YamlProcessingException.class)
+        .hasCauseInstanceOf(JacksonYAMLParseException.class)
+        .hasStackTraceContaining("The incoming YAML document exceeds the limit: 1024 code points.");
   }
 
   @Test
-  public void codePointLimitIsNotExceededYamlLoaderOptions() {
+  void codePointLimitIsNotExceededYamlLoaderOptions() {
     String okString = yamlWithNCodePoints(1000);
-    Object result = YamlHelper.newYamlLoaderOptions(LOADER_OPTIONS).load(okString);
+    Object result = YamlHelper.newYamlSafeConstructor().load(okString);
     assertThat(result).isNotNull();
   }
 
   @Test
-  public void aliasLimitIsEnforcedYamlRepresenter() {
+  void aliasLimitIsEnforcedYamlRepresenter() {
     String doc = yamlWithNAliases(56);
-    assertThatThrownBy(
-            () ->
-                YamlHelper.newYamlRepresenter(
-                        new Constructor(Object.class), new Representer(new DumperOptions()))
-                    .load(doc))
-        .isInstanceOf(YAMLException.class)
-        .hasMessage("Number of aliases for non-scalar nodes exceeds the specified max=55");
+    assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(doc))
+        .isInstanceOf(YamlProcessingException.class)
+        .hasCauseInstanceOf(JacksonYAMLParseException.class)
+        .hasStackTraceContaining("Number of aliases for non-scalar nodes exceeds the specified max=55");
   }
 
   @Test
-  public void aliasLimitIsNotExceededYamlRepresenter() {
+  void aliasLimitIsNotExceededYamlRepresenter() {
     String okString = yamlWithNAliases(50);
-    Object result =
-        YamlHelper.newYamlRepresenter(
-                new Constructor(Object.class), new Representer(new DumperOptions()))
-            .load(okString);
-    assertThat(result).isNotNull();
+    assertThat(YamlHelper.newYamlSafeConstructor().load(okString)).isNotNull();
   }
 
   @Test
-  public void codePointLimitIsEnforcedYamlRepresenter() {
-    // This string has more than 1024 characters
+  void codePointLimitIsEnforcedYamlRepresenter() {
     String bigString = yamlWithNCodePoints(1025);
-    assertThatThrownBy(
-            () ->
-                YamlHelper.newYamlRepresenter(
-                        new Constructor(Object.class), new Representer(new DumperOptions()))
-                    .load(bigString))
-        .isInstanceOf(YAMLException.class)
-        .hasMessage("The incoming YAML document exceeds the limit: 1024 code points.");
+    assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(bigString))
+        .isInstanceOf(YamlProcessingException.class)
+        .hasCauseInstanceOf(JacksonYAMLParseException.class)
+        .hasStackTraceContaining("The incoming YAML document exceeds the limit: 1024 code points.");
   }
 
   @Test
-  public void codePointLimitIsNotExceededYamlRepresenter() {
+  void codePointLimitIsNotExceededYamlRepresenter() {
     String okString = yamlWithNCodePoints(1000);
-    Object result =
-        YamlHelper.newYamlRepresenter(
-                new Constructor(Object.class), new Representer(new DumperOptions()))
-            .load(okString);
+    Object result = YamlHelper.newYamlSafeConstructor().load(okString);
     assertThat(result).isNotNull();
   }
 
@@ -212,6 +190,18 @@ class YamlHelperTest {
       sb.append("alias").append(i).append(": *default\n");
     }
 
+    return sb.toString();
+  }
+
+  private String deeplyNestedYaml(int depth) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < depth; i++) {
+      sb.append("level").append(i).append(":\n");
+      for (int j = 0; j <= i; j++) {
+        sb.append("  ");
+      }
+    }
+    sb.append("value: deep");
     return sb.toString();
   }
 

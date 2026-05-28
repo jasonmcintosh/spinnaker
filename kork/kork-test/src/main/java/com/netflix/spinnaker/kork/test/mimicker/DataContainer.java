@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.TreeTraversingParser;
 import com.netflix.spinnaker.kork.test.KorkTestException;
 import com.netflix.spinnaker.kork.test.MapUtils;
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper;
+import com.netflix.spinnaker.kork.yaml.YamlHelper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.SecureRandom;
@@ -32,7 +34,6 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
-import org.yaml.snakeyaml.Yaml;
 
 public class DataContainer {
 
@@ -40,7 +41,7 @@ public class DataContainer {
 
   private final SecureRandom random = new SecureRandom();
   private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-  private final Yaml yaml = new Yaml();
+  private final JacksonYamlWrapper yaml = YamlHelper.newYamlSafeConstructor();
 
   private final Map<String, Object> data = new HashMap<>();
 
@@ -65,7 +66,7 @@ public class DataContainer {
 
     ClassPathResource resource = new ClassPathResource(resourcePath);
     try (InputStream is = resource.getInputStream()) {
-      data.putAll(MapUtils.merge(data, yaml.load(is)));
+      data.putAll(MapUtils.merge(data, yaml.loadAs(is, Map.class)));
     } catch (IOException e) {
       throw new KorkTestException(format("Failed reading mimic data: %s", resourcePath), e);
     }

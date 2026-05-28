@@ -21,6 +21,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.netflix.spinnaker.kork.artifacts.model.Artifact;
 import com.netflix.spinnaker.kork.retrofit.Retrofit2SyncCall;
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper;
 import com.netflix.spinnaker.kork.yaml.YamlHelper;
 import com.netflix.spinnaker.orca.api.pipeline.SyntheticStageOwner;
 import com.netflix.spinnaker.orca.api.pipeline.models.PipelineExecution;
@@ -51,7 +52,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * CFRollingRedBlackStrategy is a rolling red/black strategy specifically made for Cloud Foundry to
@@ -75,8 +75,7 @@ public class CFRollingRedBlackStrategy implements Strategy, ApplicationContextAw
   private TargetServerGroupResolver targetServerGroupResolver;
   private ObjectMapper objectMapper;
   private OortService oort;
-  private static final ThreadLocal<Yaml> yamlParser =
-      ThreadLocal.withInitial(() -> YamlHelper.newYamlSafeConstructor());
+  private static final JacksonYamlWrapper yaml = YamlHelper.newYamlSafeConstructor();
 
   @Override
   public List<StageExecution> composeAfterStages(StageExecution parent) {
@@ -132,7 +131,7 @@ public class CFRollingRedBlackStrategy implements Strategy, ApplicationContextAw
 
       try (ResponseBody manifestText =
           Retrofit2SyncCall.execute(oort.fetchArtifact(boundArtifact))) {
-        Object manifestYml = yamlParser.get().load(manifestText.byteStream());
+        Object manifestYml = yaml.load(manifestText.byteStream());
         Map<String, List<Map<String, Object>>> applicationManifests =
             objectMapper.convertValue(manifestYml, new TypeReference<>() {});
         List<Map<String, Object>> applications = applicationManifests.get("applications");

@@ -33,16 +33,15 @@ import com.netflix.spinnaker.clouddriver.kubernetes.op.handler.KubernetesDeploym
 import com.netflix.spinnaker.clouddriver.kubernetes.op.handler.KubernetesReplicaSetHandler
 import com.netflix.spinnaker.clouddriver.kubernetes.op.handler.KubernetesServiceHandler
 import com.netflix.spinnaker.clouddriver.names.NamerRegistry
+import com.netflix.spinnaker.kork.yaml.YamlHelper
 import com.netflix.spinnaker.moniker.Moniker
 import org.apache.commons.lang3.tuple.Pair
-import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.SafeConstructor
 import spock.lang.Specification
 import spock.lang.Unroll
 
 class KubernetesCacheDataConvertSpec extends Specification {
   def mapper = new ObjectMapper()
-  def yaml = new Yaml(new SafeConstructor())
+  def yaml = YamlHelper.newYamlSafeConstructor()
 
   KubernetesManifest stringToManifest(String input) {
     return mapper.convertValue(yaml.load(input), KubernetesManifest.class)

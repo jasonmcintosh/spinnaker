@@ -18,6 +18,7 @@ package com.netflix.spinnaker.orca.igor.tasks;
 
 import com.netflix.spinnaker.kork.core.RetrySupport;
 import com.netflix.spinnaker.kork.retrofit.Retrofit2SyncCall;
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper;
 import com.netflix.spinnaker.kork.yaml.YamlHelper;
 import com.netflix.spinnaker.orca.api.pipeline.Task;
 import com.netflix.spinnaker.orca.api.pipeline.TaskResult;
@@ -31,7 +32,6 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.yaml.snakeyaml.Yaml;
 
 @Component
 @RequiredArgsConstructor
@@ -40,8 +40,7 @@ public class StopGoogleCloudBuildTask implements Task {
   private final ContextParameterProcessor contextParameterProcessor;
 
   private final RetrySupport retrySupport = new RetrySupport();
-  private static final ThreadLocal<Yaml> yamlParser =
-      ThreadLocal.withInitial(() -> YamlHelper.newYamlSafeConstructor());
+  private static final JacksonYamlWrapper yamlParser = YamlHelper.newYamlSafeConstructor();
 
   @Override
   @Nonnull

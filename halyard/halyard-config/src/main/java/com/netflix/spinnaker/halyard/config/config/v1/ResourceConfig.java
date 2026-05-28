@@ -16,6 +16,7 @@
 
 package com.netflix.spinnaker.halyard.config.config.v1;
 
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper;
 import com.netflix.spinnaker.kork.yaml.YamlHelper;
 import java.io.File;
 import java.nio.file.Paths;
@@ -29,7 +30,6 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
 
 @Component
 public class ResourceConfig {
@@ -97,7 +97,7 @@ public class ResourceConfig {
   @Bean
   @Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE) // snake yaml is not thread safe
   // (https://bitbucket.org/asomov/snakeyaml/wiki/Documentation#markdown-header-threading)
-  Yaml yamlParser() {
+  JacksonYamlWrapper yamlParser() {
     DumperOptions options = new DumperOptions();
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
     options.setDefaultScalarStyle(DumperOptions.ScalarStyle.PLAIN);

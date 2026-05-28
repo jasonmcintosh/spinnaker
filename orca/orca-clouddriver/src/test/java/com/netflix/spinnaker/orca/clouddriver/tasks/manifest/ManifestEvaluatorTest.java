@@ -57,7 +57,7 @@ final class ManifestEvaluatorTest {
   @Mock private OortService oortService;
 
   private final List<Map<Object, Object>> manifests =
-      ImmutableList.of(
+      ImmutableList.ofV1SchemaIntegrationSpec(
           ImmutableMap.builder()
               .put("metadata", ImmutableMap.builder().put("name", "my-manifest").build())
               .build());

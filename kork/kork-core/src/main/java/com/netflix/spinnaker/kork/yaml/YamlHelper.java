@@ -1,21 +1,21 @@
 package com.netflix.spinnaker.kork.yaml;
 
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactoryBuilder;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.Constructor;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
-import org.yaml.snakeyaml.representer.Representer;
-import org.yaml.snakeyaml.resolver.Resolver;
 
 /**
- * Utility component for creating preconfigured {@link Yaml} instances with optional
+ * Utility component for creating preconfigured Jackson-based YAML instances with optional
  * security-related parsing limits.
  *
- * <p>This helper centralizes the creation of {@link Yaml} objects used across the Spinnaker
+ * <p>This helper centralizes the creation of YAML parser objects used across the Spinnaker
  * ecosystem, ensuring that YAML parsing behavior is consistent and secure. It applies limits
  * defined in {@link YamlParserProperties}, such as:
  *
@@ -24,22 +24,21 @@ import org.yaml.snakeyaml.resolver.Resolver;
  *   <li>{@code codePointLimit} – to restrict the maximum size of YAML input
  * </ul>
  *
- * <p>If no security-related properties are configured, the helper falls back to creating standard
- * {@link Yaml} instances using SnakeYAML defaults.
+ * <p>This implementation uses Jackson's YAML dataformat library instead of SnakeYAML, providing
+ * better integration with the Jackson ecosystem and improved security controls.
  *
- * <p>This class also provides convenience factory methods for constructing {@link Yaml} objects
- * with various configurations such as: {@link Constructor}, {@link SafeConstructor}, {@link
- * DumperOptions}, {@link LoaderOptions}, and {@link Representer}.
+ * <p>If no security-related properties are configured, the helper falls back to creating standard
+ * YAML parser instances using Jackson defaults.
  *
  * <p><strong>Usage Example:</strong>
  *
  * <pre>{@code
- * Yaml yaml = YamlHelper.newYaml(); // creates a secure YAML parser if properties are set
- * Map<String, Object> data = yaml.load(yamlContent);
+ * JacksonYamlWrapper yaml = YamlHelper.newYaml();
+ * Map<String, Object> data = (Map<String, Object>) yaml.load(yamlContent);
  * }</pre>
  *
  * <p>When {@link YamlParserProperties} is available in the Spring context, security properties are
- * automatically applied to all created {@link Yaml} instances.
+ * automatically applied to all created YAML parser instances.
  */
 @Component
 @Log4j2
@@ -59,112 +58,169 @@ public class YamlHelper {
   }
 
   /**
-   * Creates a new {@link Yaml} instance using either default or secure {@link LoaderOptions},
-   * depending on whether {@link YamlParserProperties} are configured.
+   * Creates a new {@link JacksonYamlWrapper} instance with safe construction for a specific class.
    *
-   * @return a new {@link Yaml} instance
+   * @return a new YAML wrapper instance
    */
-  @Deprecated
-  public static Yaml newYaml() {
-    log.warn(
-        "WARNING:  Invoked newYaml!  THIS DOES NOT load yaml safely and should ONLY be used in initialization or by processes that are trusted!",
-        new Exception());
-    if (hasYamlSecurityPropertiesConfigured()) {
-      LoaderOptions opts = getLoaderOptions();
-
-      Constructor constructor = new Constructor(opts);
-      DumperOptions dumperOpts = new DumperOptions();
-      Representer representer = new Representer(dumperOpts);
-      Resolver resolver = new Resolver(); // default tag resolver
-
-      return new Yaml(constructor, representer, dumperOpts, opts, resolver);
-    }
-
-    return new Yaml();
+  public static JacksonYamlWrapper newYamlSafeConstructor() {
+    YAMLFactory factory = createYamlFactory();
+    applyStreamConstraints(factory);
+    ObjectMapper mapper = new ObjectMapper(factory);
+    return new JacksonYamlWrapper(mapper);
   }
 
   /**
-   * Creates a new {@link Yaml} instance with a {@link SafeConstructor}, ensuring that only standard
-   * types are loaded (no arbitrary object instantiation). If security properties are set, they are
-   * applied via {@link LoaderOptions}.
+   * Creates a new {@link JacksonYamlWrapper} instance with default YAML generation options.
    *
-   * @return a new {@link Yaml} instance with safe construction
+   * <p>Note: The dumperOptions parameter is not directly used in Jackson but this method is kept
+   * for API compatibility with the SnakeYAML-based implementation.
+   *
+   * @param dumperOptions ignored (kept for API compatibility)
+   * @return a new YAML wrapper instance
    */
-  public static Yaml newYamlSafeConstructor() {
-    if (hasYamlSecurityPropertiesConfigured()) {
-      LoaderOptions opts = getLoaderOptions();
-
-      SafeConstructor constructor = new SafeConstructor(opts);
-      DumperOptions dumperOpts = new DumperOptions();
-      Representer representer = new Representer(dumperOpts);
-
-      return new Yaml(constructor, representer, dumperOpts, opts);
-    }
-
-    return new Yaml(new SafeConstructor(new LoaderOptions()));
+  public static JacksonYamlWrapper newYamlDumperOptions(DumperOptions dumperOptions) {
+    YAMLFactory factory = createYamlFactory(dumperOptions);
+    applyStreamConstraints(factory);
+    ObjectMapper mapper = new ObjectMapper(factory);
+    return new JacksonYamlWrapper(mapper);
   }
 
   /**
-   * Creates a new {@link Yaml} instance using the specified {@link DumperOptions}. Applies
-   * security-related {@link LoaderOptions} if available.
+   * Creates a new {@link JacksonYamlWrapper} instance with specified loader options.
    *
-   * @param dumperOptions configuration for YAML serialization
-   * @return a new {@link Yaml} instance
+   * <p>Note: The loaderOptions parameter is not directly used in Jackson but this method is kept
+   * for API compatibility. Security properties are still applied if configured.
+   *
+   * @param loaderOptions ignored (kept for API compatibility)
+   * @return a new YAML wrapper instance
    */
-  public static Yaml newYamlDumperOptions(DumperOptions dumperOptions) {
-    if (hasYamlSecurityPropertiesConfigured()) {
-      LoaderOptions opts = getLoaderOptions();
-
-      SafeConstructor constructor = new SafeConstructor(opts);
-      Representer representer = new Representer(dumperOptions);
-
-      return new Yaml(constructor, representer, dumperOptions, opts);
-    }
-
-    return new Yaml(
-        new SafeConstructor(new LoaderOptions()), new Representer(dumperOptions), dumperOptions);
+  public static JacksonYamlWrapper newYamlLoaderOptions(LoaderOptions loaderOptions) {
+    YAMLFactory factory = createYamlFactory(loaderOptions);
+    applyStreamConstraints(factory);
+    ObjectMapper mapper = new ObjectMapper(factory);
+    return new JacksonYamlWrapper(mapper);
   }
 
   /**
-   * Creates a new {@link Yaml} instance with the specified {@link LoaderOptions}. If security
-   * properties are configured, they override the provided options.
+   * Creates a configured YAMLFactory with appropriate settings.
    *
-   * @param loaderOptions custom loader options for YAML parsing
-   * @return a new {@link Yaml} instance
+   * @return a new YAMLFactory instance
    */
-  public static Yaml newYamlLoaderOptions(LoaderOptions loaderOptions) {
+  private static YAMLFactory createYamlFactory() {
+    LoaderOptions loaderOptions = null;
     if (hasYamlSecurityPropertiesConfigured()) {
-      LoaderOptions opts = getLoaderOptions();
-      return new Yaml(opts);
+      loaderOptions = new LoaderOptions();
+      if (yamlParserProperties.getMaxAliasesForCollections() != null) {
+        loaderOptions.setMaxAliasesForCollections(
+            yamlParserProperties.getMaxAliasesForCollections());
+      }
+      if (yamlParserProperties.getCodePointLimit() != null) {
+        loaderOptions.setCodePointLimit(yamlParserProperties.getCodePointLimit());
+      }
     }
-    return new Yaml(loaderOptions);
+
+    YAMLFactoryBuilder builder =
+        YAMLFactory.builder()
+            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+            .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+            .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
+
+    if (loaderOptions != null) {
+      builder.loaderOptions(loaderOptions);
+    }
+
+    return builder.build();
+  }
+
+  private static YAMLFactory createYamlFactory(DumperOptions dumperOptions) {
+    LoaderOptions loaderOptions = null;
+    if (hasYamlSecurityPropertiesConfigured()) {
+      loaderOptions = new LoaderOptions();
+      if (yamlParserProperties.getMaxAliasesForCollections() != null) {
+        loaderOptions.setMaxAliasesForCollections(
+            yamlParserProperties.getMaxAliasesForCollections());
+      }
+      if (yamlParserProperties.getCodePointLimit() != null) {
+        loaderOptions.setCodePointLimit(yamlParserProperties.getCodePointLimit());
+      }
+    }
+
+    YAMLFactoryBuilder builder =
+        YAMLFactory.builder()
+            .dumperOptions(dumperOptions)
+            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+            .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+            .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
+
+    if (loaderOptions != null) {
+      builder.loaderOptions(loaderOptions);
+    }
+
+    return builder.build();
+  }
+
+  private static YAMLFactory createYamlFactory(LoaderOptions loaderOptions) {
+    // Apply security constraints from properties if configured
+    if (hasYamlSecurityPropertiesConfigured() && loaderOptions != null) {
+      if (yamlParserProperties.getMaxAliasesForCollections() != null) {
+        loaderOptions.setMaxAliasesForCollections(
+            yamlParserProperties.getMaxAliasesForCollections());
+      }
+      if (yamlParserProperties.getCodePointLimit() != null) {
+        loaderOptions.setCodePointLimit(yamlParserProperties.getCodePointLimit());
+      }
+    }
+
+    return YAMLFactory.builder()
+        .loaderOptions(loaderOptions)
+        .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+        .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+        .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR)
+        .build();
   }
 
   /**
-   * Creates a new {@link Yaml} instance using the given {@link Constructor} and {@link
-   * Representer}. Applies secure {@link LoaderOptions} if configured.
+   * Applies security-related stream constraints to the YAMLFactory based on configured properties.
    *
-   * @param constructor the YAML constructor
-   * @param representer the YAML representer
-   * @return a new {@link Yaml} instance
+   * @param factory the YAMLFactory to configure
    */
-  public static Yaml newYamlRepresenter(Constructor constructor, Representer representer) {
-    if (hasYamlSecurityPropertiesConfigured()) {
-      LoaderOptions opts = getLoaderOptions();
-      return new Yaml(constructor, representer, new DumperOptions(), opts);
+  private static void applyStreamConstraints(YAMLFactory factory) {
+    if (!hasYamlSecurityPropertiesConfigured()) {
+      return;
     }
-    return new Yaml(constructor, representer);
-  }
 
-  private static LoaderOptions getLoaderOptions() {
-    LoaderOptions opts = new LoaderOptions();
-    if (yamlParserProperties.getMaxAliasesForCollections() != null) {
-      opts.setMaxAliasesForCollections(yamlParserProperties.getMaxAliasesForCollections());
-    }
+    StreamReadConstraints.Builder constraintsBuilder = StreamReadConstraints.builder();
 
     if (yamlParserProperties.getCodePointLimit() != null) {
-      opts.setCodePointLimit(yamlParserProperties.getCodePointLimit());
+      long limit = yamlParserProperties.getCodePointLimit();
+      // Jackson uses maxStringLength for similar protection
+      constraintsBuilder.maxStringLength((int) limit);
+      log.debug("Applied YAML code point limit: {}", limit);
     }
+
+    if (yamlParserProperties.getMaxAliasesForCollections() != null) {
+      int maxAliases = yamlParserProperties.getMaxAliasesForCollections();
+      // Jackson doesn't have a direct equivalent, but we can limit nesting depth
+      // as a proxy for protection against alias expansion attacks
+      constraintsBuilder.maxNestingDepth(Math.min(maxAliases, 1000));
+      log.debug("Applied YAML max aliases limit (via nesting depth): {}", maxAliases);
+    }
+
+    factory.setStreamReadConstraints(constraintsBuilder.build());
+  }
+
+  /**
+   * Gets loader options configuration. This method is kept for API compatibility but returns a
+   * no-op object since Jackson handles constraints differently.
+   *
+   * @param opts ignored
+   * @return the input object (for API compatibility)
+   * @deprecated This method is kept for backward compatibility but has no effect with Jackson
+   */
+  @Deprecated
+  public static Object getLoaderOptions(Object opts) {
+    // Return the input for API compatibility
+    // Actual constraints are applied via StreamReadConstraints in Jackson
     return opts;
   }
 }

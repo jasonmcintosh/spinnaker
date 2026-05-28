@@ -39,7 +39,6 @@ import com.google.common.collect.ImmutableMap
 import com.netflix.spinnaker.orca.pipeline.expressions.PipelineExpressionEvaluator
 import com.netflix.spinnaker.orca.pipeline.util.ContextParameterProcessor
 import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.SafeConstructor
 
 import java.time.Duration
 import java.util.function.Supplier
