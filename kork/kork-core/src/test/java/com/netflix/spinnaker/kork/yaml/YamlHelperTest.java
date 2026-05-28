@@ -27,7 +27,8 @@ class YamlHelperTest {
     assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(doc))
         .isInstanceOf(YamlProcessingException.class)
         .hasCauseInstanceOf(JacksonYAMLParseException.class)
-        .hasStackTraceContaining("Number of aliases for non-scalar nodes exceeds the specified max=55");
+        .hasStackTraceContaining(
+            "Number of aliases for non-scalar nodes exceeds the specified max=55");
   }
 
   @Test
@@ -61,7 +62,8 @@ class YamlHelperTest {
     assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(doc))
         .isInstanceOf(YamlProcessingException.class)
         .hasCauseInstanceOf(JacksonYAMLParseException.class)
-        .hasStackTraceContaining("Number of aliases for non-scalar nodes exceeds the specified max=55");
+        .hasStackTraceContaining(
+            "Number of aliases for non-scalar nodes exceeds the specified max=55");
   }
 
   @Test
@@ -93,7 +95,8 @@ class YamlHelperTest {
     assertThatThrownBy(() -> YamlHelper.newYamlDumperOptions(null).load(doc))
         .isInstanceOf(YamlProcessingException.class)
         .hasCauseInstanceOf(JacksonYAMLParseException.class)
-        .hasStackTraceContaining("Number of aliases for non-scalar nodes exceeds the specified max=55");
+        .hasStackTraceContaining(
+            "Number of aliases for non-scalar nodes exceeds the specified max=55");
   }
 
   @Test
@@ -125,7 +128,8 @@ class YamlHelperTest {
     assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(doc))
         .isInstanceOf(YamlProcessingException.class)
         .hasCauseInstanceOf(JacksonYAMLParseException.class)
-        .hasStackTraceContaining("Number of aliases for non-scalar nodes exceeds the specified max=55");
+        .hasStackTraceContaining(
+            "Number of aliases for non-scalar nodes exceeds the specified max=55");
   }
 
   @Test
@@ -157,7 +161,8 @@ class YamlHelperTest {
     assertThatThrownBy(() -> YamlHelper.newYamlSafeConstructor().load(doc))
         .isInstanceOf(YamlProcessingException.class)
         .hasCauseInstanceOf(JacksonYAMLParseException.class)
-        .hasStackTraceContaining("Number of aliases for non-scalar nodes exceeds the specified max=55");
+        .hasStackTraceContaining(
+            "Number of aliases for non-scalar nodes exceeds the specified max=55");
   }
 
   @Test
@@ -184,10 +189,10 @@ class YamlHelperTest {
 
   private String yamlWithNAliases(int nAliases) {
     StringBuilder sb = new StringBuilder();
-    sb.append("defaults: &default\n  a: 1\n  b: 2\n");
+    sb.append("d: &d\n  a: 1\n");
 
     for (int i = 0; i < nAliases; i++) {
-      sb.append("alias").append(i).append(": *default\n");
+      sb.append("a").append(i).append(": *d\n");
     }
 
     return sb.toString();

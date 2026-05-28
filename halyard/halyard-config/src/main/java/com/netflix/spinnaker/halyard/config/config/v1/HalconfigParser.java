@@ -18,6 +18,7 @@ package com.netflix.spinnaker.halyard.config.config.v1;
 
 import static com.netflix.spinnaker.halyard.core.problem.v1.Problem.Severity.FATAL;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.netflix.spinnaker.halyard.config.error.v1.ParseConfigException;
 import com.netflix.spinnaker.halyard.config.model.v1.node.Halconfig;
 import com.netflix.spinnaker.halyard.config.model.v1.node.Node;
@@ -27,6 +28,7 @@ import com.netflix.spinnaker.halyard.core.GlobalApplicationOptions;
 import com.netflix.spinnaker.halyard.core.error.v1.HalException;
 import com.netflix.spinnaker.halyard.core.problem.v1.Problem.Severity;
 import com.netflix.spinnaker.halyard.core.tasks.v1.DaemonTaskHandler;
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -47,7 +49,6 @@ import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
-import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.parser.ParserException;
 import org.yaml.snakeyaml.scanner.ScannerException;
 
@@ -75,12 +76,14 @@ public class HalconfigParser {
       HalconfigDirectoryStructure halconfigDirectoryStructure,
       ApplicationContext applicationContext) {
     this.objectMapper = objectMapper;
+    this.objectMapper.configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true);
+
     this.halconfigDirectoryStructure = halconfigDirectoryStructure;
     this.applicationContext = applicationContext;
   }
 
-  private Yaml getYamlParser() {
-    return applicationContext.getBean(Yaml.class);
+  private JacksonYamlWrapper getYamlParser() {
+    return applicationContext.getBean(JacksonYamlWrapper.class);
   }
 
   /**

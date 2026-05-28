@@ -20,6 +20,7 @@ import com.netflix.spinnaker.halyard.config.config.v1.HalconfigDirectoryStructur
 import com.netflix.spinnaker.halyard.config.config.v1.HalconfigParser
 import com.netflix.spinnaker.halyard.config.config.v1.StrictObjectMapper
 import com.netflix.spinnaker.halyard.config.model.v1.node.Halconfig
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper
 import com.netflix.spinnaker.kork.yaml.YamlHelper
 import org.springframework.context.ApplicationContext
 import org.yaml.snakeyaml.Yaml
@@ -31,7 +32,7 @@ import java.nio.charset.StandardCharsets
 class HalconfigParserMocker extends Specification {
   HalconfigParser mockHalconfigParser(String config) {
     ApplicationContext applicationContext = Stub(ApplicationContext.class)
-    applicationContext.getBean(Yaml.class) >> YamlHelper.newYamlSafeConstructor()
+    applicationContext.getBean(JacksonYamlWrapper.class) >> YamlHelper.newYamlSafeConstructor()
 
     // HalconfigDirectoryStructure needs a non-null halconfigDirectory for
     // Paths.get(getHalconfigDirectory()) to work properly.  The directory

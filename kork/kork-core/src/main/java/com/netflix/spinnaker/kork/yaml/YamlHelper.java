@@ -1,6 +1,7 @@
 package com.netflix.spinnaker.kork.yaml;
 
 import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactoryBuilder;
@@ -66,6 +67,7 @@ public class YamlHelper {
     YAMLFactory factory = createYamlFactory();
     applyStreamConstraints(factory);
     ObjectMapper mapper = new ObjectMapper(factory);
+    mapper.configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true);
     return new JacksonYamlWrapper(mapper);
   }
 
