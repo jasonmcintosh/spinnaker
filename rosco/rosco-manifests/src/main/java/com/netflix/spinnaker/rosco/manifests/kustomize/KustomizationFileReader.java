@@ -44,6 +44,9 @@ public class KustomizationFileReader {
   private static final List<String> KUSTOMIZATION_FILENAMES =
       ImmutableList.of("kustomization.yaml", "kustomization.yml", "kustomization");
 
+  private static final ObjectMapper objectMapper =
+      new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
   public KustomizationFileReader(ClouddriverService clouddriverService) {
     this.clouddriverService = clouddriverService;
     this.yamlObjectMapper = new ObjectMapper(new YAMLFactory());

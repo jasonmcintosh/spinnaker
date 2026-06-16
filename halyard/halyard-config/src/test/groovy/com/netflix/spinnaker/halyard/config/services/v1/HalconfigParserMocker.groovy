@@ -23,8 +23,6 @@ import com.netflix.spinnaker.halyard.config.model.v1.node.Halconfig
 import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper
 import com.netflix.spinnaker.kork.yaml.YamlHelper
 import org.springframework.context.ApplicationContext
-import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.SafeConstructor
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
