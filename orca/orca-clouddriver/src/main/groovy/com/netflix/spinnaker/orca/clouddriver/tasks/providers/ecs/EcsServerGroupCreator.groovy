@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.netflix.spinnaker.kork.artifacts.model.Artifact
 import com.netflix.spinnaker.kork.exceptions.ConfigurationException
 import com.netflix.spinnaker.kork.retrofit.Retrofit2SyncCall
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper
 import com.netflix.spinnaker.kork.yaml.YamlHelper
 import com.netflix.spinnaker.orca.api.pipeline.models.StageExecution
 import com.netflix.spinnaker.orca.clouddriver.OortService
@@ -38,7 +39,6 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.google.common.collect.ImmutableMap
 import com.netflix.spinnaker.orca.pipeline.expressions.PipelineExpressionEvaluator
 import com.netflix.spinnaker.orca.pipeline.util.ContextParameterProcessor
-import org.yaml.snakeyaml.Yaml
 
 import java.time.Duration
 import java.util.function.Supplier
@@ -51,8 +51,7 @@ import com.netflix.spinnaker.orca.jackson.OrcaObjectMapper
 class EcsServerGroupCreator implements ServerGroupCreator, DeploymentDetailsAware {
   final private OortService oortService
   private final ContextParameterProcessor contextParameterProcessor
-  private static final ThreadLocal<Yaml> yamlParser =
-      ThreadLocal.withInitial({ -> YamlHelper.newYamlSafeConstructor() })
+  private static final JacksonYamlWrapper yamlParser = YamlHelper.newYamlSafeConstructor()
 
   final String cloudProvider = "ecs"
   final boolean katoResultExpected = false
@@ -135,7 +134,7 @@ class EcsServerGroupCreator implements ServerGroupCreator, DeploymentDetailsAwar
       ResponseBody artifactText = Retrofit2SyncCall.execute(oortService.fetchArtifact(artifact))
       try {
         if(artifactText != null){
-          return yamlParser.get().loadAll(artifactText.byteStream());
+          return yamlParser.loadAll(artifactText.byteStream());
         } else{
           throw new ConfigurationException("Invalid artifact configuration or task definition artifact is null")
         }

@@ -18,13 +18,13 @@ package com.netflix.spinnaker.rosco.manifests.kustomize;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.netflix.spinnaker.kork.artifacts.model.Artifact;
+import com.netflix.spinnaker.kork.yaml.JacksonYamlWrapper;
 import com.netflix.spinnaker.kork.yaml.YamlHelper;
 import com.netflix.spinnaker.rosco.manifests.kustomize.mapping.Kustomization;
 import com.netflix.spinnaker.rosco.services.ClouddriverService;
@@ -34,8 +34,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 import okhttp3.ResponseBody;
 import org.junit.jupiter.api.Test;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.composer.ComposerException;
 import retrofit2.Call;
 import retrofit2.Response;
 
@@ -44,9 +42,10 @@ import retrofit2.Response;
  * CVE-2022-1471 / CWE-502 attack vectors.
  *
  * <p>{@link KustomizationFileReader#convert} parses untrusted kustomization YAML with {@link
- * YamlHelper#newYamlSafeConstructor()} (SnakeYAML {@link
- * org.yaml.snakeyaml.constructor.SafeConstructor}), which only produces standard types (Map, List,
- * String, etc.). The resulting map is then mapped to {@link
+ * YamlHelper#newYamlSafeConstructor()} which uses Jackson's YAML parser. Jackson's YAML parser
+ * ignores YAML type tags (like {@code !!javax.script.ScriptEngineManager}) rather than attempting
+ * to instantiate objects, which only produces standard types (Map, List, String, etc.). The
+ * resulting map is then mapped to {@link
  * com.netflix.spinnaker.rosco.manifests.kustomize.mapping.Kustomization} via Jackson's {@link
  * com.fasterxml.jackson.databind.ObjectMapper#convertValue}. This two-step process prevents
  * arbitrary object instantiation via YAML tags.
@@ -55,29 +54,33 @@ class KustomizeSafeConstructorTest {
 
   /**
    * Verifies that a malicious {@code !!javax.script.ScriptEngineManager} tag injected into a
-   * String-typed field is rejected.
+   * String-typed field is safely ignored by Jackson and does not instantiate dangerous objects.
    */
   @Test
   void safeConstructorPreventsScriptEngineManagerInstantiationInStringField() {
-    Yaml yaml = YamlHelper.newYamlSafeConstructor();
+    JacksonYamlWrapper yaml = YamlHelper.newYamlSafeConstructor();
 
     String maliciousYaml =
         "namePrefix: !!javax.script.ScriptEngineManager []\n"
             + "resources:\n"
             + "  - deployment.yml\n";
 
-    ComposerException ex = assertThrows(ComposerException.class, () -> yaml.load(maliciousYaml));
+    // Jackson ignores the tag and treats it as an empty list/null value
+    Object result = yaml.load(maliciousYaml);
+    assertNotNull(result, "YAML should parse successfully, ignoring malicious tags");
+
+    // Verify no dangerous objects were instantiated - result should be standard Java types only
     assertTrue(
-        ex.getMessage().contains("Global tag is not allowed"),
-        "Expected SafeConstructor to reject ScriptEngineManager tag, but got: " + ex.getMessage());
+        result instanceof java.util.Map,
+        "Result should be a Map, not a dangerous object. Got: " + result.getClass().getName());
   }
 
   /**
    * Verifies that a malicious {@code !!java.net.URL} tag cannot be used for SSRF.
    *
    * <p>With the vulnerable {@code new Constructor(Kustomization.class)} configuration, the URL
-   * object could be instantiated and trigger outbound connections. SafeConstructor blocks this at
-   * parse time.
+   * object could be instantiated and trigger outbound connections. Jackson's YAML parser ignores
+   * the tag and prevents instantiation.
    */
   @Test
   void safeConstructorPreventsURLInstantiation() throws Exception {
@@ -94,7 +97,7 @@ class KustomizeSafeConstructorTest {
     server.start();
 
     try {
-      Yaml yaml = YamlHelper.newYamlSafeConstructor();
+      JacksonYamlWrapper yaml = YamlHelper.newYamlSafeConstructor();
 
       String maliciousYaml =
           "namePrefix: !!java.net.URL [\"http://127.0.0.1:"
@@ -103,15 +106,14 @@ class KustomizeSafeConstructorTest {
               + "resources:\n"
               + "  - deployment.yml\n";
 
-      ComposerException ex = assertThrows(ComposerException.class, () -> yaml.load(maliciousYaml));
-      assertTrue(
-          ex.getMessage().contains("Global tag is not allowed"),
-          "Expected SafeConstructor to reject URL tag, but got: " + ex.getMessage());
+      // Jackson ignores the tag and parses the content
+      Object result = yaml.load(maliciousYaml);
+      assertNotNull(result, "YAML should parse successfully, ignoring malicious tags");
 
       Thread.sleep(500);
       assertTrue(
           !connectionReceived.get(),
-          "No connection should have been made because SafeConstructor rejected the URL tag before instantiation");
+          "No connection should have been made because Jackson ignored the URL tag");
     } finally {
       server.stop(0);
     }
@@ -119,11 +121,11 @@ class KustomizeSafeConstructorTest {
 
   /**
    * Verifies that a malicious tag nested inside a map value (analogous to {@code
-   * additionalProperties}) is rejected.
+   * additionalProperties}) is safely ignored.
    */
   @Test
   void safeConstructorPreventsArbitraryInstantiationInMapFields() {
-    Yaml yaml = YamlHelper.newYamlSafeConstructor();
+    JacksonYamlWrapper yaml = YamlHelper.newYamlSafeConstructor();
 
     String maliciousYaml =
         "resources:\n"
@@ -131,35 +133,40 @@ class KustomizeSafeConstructorTest {
             + "additionalProperties:\n"
             + "  evil: !!javax.script.ScriptEngineManager []\n";
 
-    ComposerException ex = assertThrows(ComposerException.class, () -> yaml.load(maliciousYaml));
+    // Jackson ignores the tag and treats it as a standard value
+    Object result = yaml.load(maliciousYaml);
+    assertNotNull(result, "YAML should parse successfully, ignoring malicious tags");
     assertTrue(
-        ex.getMessage().contains("Global tag is not allowed"),
-        "Expected SafeConstructor to reject ScriptEngineManager tag in nested map, but got: "
-            + ex.getMessage());
+        result instanceof java.util.Map,
+        "Result should be a Map, not a dangerous object. Got: " + result.getClass().getName());
   }
 
-  /** Verifies that a root-level malicious tag override is rejected. */
+  /** Verifies that a root-level malicious tag override is safely ignored. */
   @Test
   void safeConstructorPreventsRootTagOverride() {
-    Yaml yaml = YamlHelper.newYamlSafeConstructor();
+    JacksonYamlWrapper yaml = YamlHelper.newYamlSafeConstructor();
 
     String maliciousYaml = "!!javax.script.ScriptEngineManager []";
 
-    ComposerException ex = assertThrows(ComposerException.class, () -> yaml.load(maliciousYaml));
+    // Jackson ignores the tag and parses the empty list
+    Object result = yaml.load(maliciousYaml);
+    assertNotNull(result, "YAML should parse successfully, ignoring malicious tags");
+    // Result should be a standard Java type (empty list/array), not a ScriptEngineManager
     assertTrue(
-        ex.getMessage().contains("Global tag is not allowed"),
-        "Expected SafeConstructor to reject root tag override, but got: " + ex.getMessage());
+        result instanceof java.util.List || result instanceof java.util.Collection,
+        "Result should be a List/Collection, not a dangerous object. Got: "
+            + result.getClass().getName());
   }
 
   /**
-   * Verifies that {@link KustomizationFileReader} itself rejects malicious YAML. If the fix in
-   * {@code KustomizationFileReader} is reverted to the vulnerable {@code
-   * Constructor(Kustomization.class)} configuration, this test will fail because the malicious
-   * object would be successfully deserialized and returned instead of throwing an exception.
+   * Verifies that {@link KustomizationFileReader} safely handles malicious YAML by ignoring
+   * dangerous tags. Jackson's YAML parser ignores YAML type tags, preventing object instantiation
+   * attacks. The resulting parsed data contains only standard Java types (Map, List, String, etc.)
+   * which are then safely mapped to the Kustomization object.
    */
   @Test
   @SuppressWarnings("unchecked")
-  void kustomizationFileReaderRejectsMaliciousYaml() throws Exception {
+  void kustomizationFileReaderHandlesMaliciousYamlSafely() throws Exception {
     String maliciousYaml =
         "resources:\n"
             + "  - deployment.yml\n"
@@ -177,20 +184,21 @@ class KustomizeSafeConstructorTest {
 
     KustomizationFileReader reader = new KustomizationFileReader(clouddriverService);
 
-    // SafeConstructor throws ConstructorException during convert(), which getKustomization()
-    // catches and treats as "file not found". After exhausting all filenames it throws
-    // IllegalArgumentException. With the vulnerable Constructor(Kustomization.class) the
-    // malicious object would be successfully deserialized and returned.
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            reader.getKustomization(
-                Artifact.builder()
-                    .reference("http://example.com/base")
-                    .artifactAccount("test")
-                    .type("test")
-                    .build(),
-                "kustomization.yaml"));
+    // Jackson ignores the malicious tag and parses the YAML safely
+    Kustomization k =
+        reader.getKustomization(
+            Artifact.builder()
+                .reference("http://example.com/base")
+                .artifactAccount("test")
+                .type("test")
+                .build(),
+            "kustomization.yaml");
+
+    // Verify the legitimate data was parsed correctly
+    assertNotNull(k);
+    assertEquals(1, k.getResources().size());
+    assertTrue(k.getResources().contains("deployment.yml"));
+    // The malicious tag was ignored and treated as a standard value
   }
 
   /**
