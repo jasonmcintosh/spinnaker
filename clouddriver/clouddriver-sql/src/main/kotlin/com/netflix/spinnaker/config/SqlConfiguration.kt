@@ -21,9 +21,11 @@ import com.netflix.spinnaker.clouddriver.data.task.TaskRepository
 import com.netflix.spinnaker.clouddriver.event.persistence.EventRepository
 import com.netflix.spinnaker.clouddriver.security.AccountDefinitionMapper
 import com.netflix.spinnaker.clouddriver.security.AccountDefinitionRepository
+import com.netflix.spinnaker.clouddriver.model.EntityTagsProvider
 import com.netflix.spinnaker.clouddriver.sql.SqlProvider
 import com.netflix.spinnaker.clouddriver.sql.SqlTaskCleanupAgent
 import com.netflix.spinnaker.clouddriver.sql.SqlTaskRepository
+import com.netflix.spinnaker.clouddriver.sql.entitytags.SqlEntityTagsProvider
 import com.netflix.spinnaker.clouddriver.sql.event.SqlEventCleanupAgent
 import com.netflix.spinnaker.clouddriver.sql.event.SqlEventRepository
 import com.netflix.spinnaker.clouddriver.sql.security.SqlAccountDefinitionRepository
@@ -134,5 +136,14 @@ class SqlConfiguration {
     clock: Clock,
     mapper: AccountDefinitionMapper
   ): AccountDefinitionRepository = SqlAccountDefinitionRepository(jooq, mapper, clock, ConnectionPools.ACCOUNTS.value)
+
+  @Bean
+  @ConditionalOnProperty(value = ["entity-tags.provider"], havingValue = "sql", matchIfMissing = true)
+  fun sqlEntityTagsProvider(
+    jooq: DSLContext,
+    objectMapper: ObjectMapper,
+    clock: Clock
+  ): EntityTagsProvider =
+    SqlEntityTagsProvider(jooq, objectMapper, clock, ConnectionPools.TASKS.value)
 
 }
