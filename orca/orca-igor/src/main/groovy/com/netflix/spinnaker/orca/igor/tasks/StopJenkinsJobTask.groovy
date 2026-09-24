@@ -44,6 +44,14 @@ class StopJenkinsJobTask implements Task {
     String job = stage.context.job
     String queuedBuild = stage.context.queuedBuild
     Integer buildNumber = stage.context.buildNumber ? (Integer) stage.context.buildNumber : 0
+    boolean alreadyQueued = stage.context.alreadyQueued as boolean
+
+    if (alreadyQueued) {
+      // Igor reported that this build was already queued/running under a non-concurrent job
+      // before this stage started it, so this stage doesn't own it and must not cancel it.
+      log.info("Skipping stop of job={} on master={} because it was already queued/running before this stage started it", job, master)
+      return TaskResult.SUCCEEDED
+    }
 
     if (queuedBuild != null) {
       buildService.stop(master, job, queuedBuild, buildNumber)

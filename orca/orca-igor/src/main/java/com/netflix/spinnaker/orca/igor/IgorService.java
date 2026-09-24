@@ -40,6 +40,7 @@ public interface IgorService {
       @Path("name") String master,
       @Path(encoded = true, value = "jobName") String jobName,
       @QueryMap Map<String, String> queryParams,
+      @Query("includeQueuedBuildMetadata") boolean includeQueuedBuildMetadata,
       @Body String startTime);
 
   @PUT("masters/{name}/jobs/{jobName}/stop/{queuedBuild}/{buildNumber}")

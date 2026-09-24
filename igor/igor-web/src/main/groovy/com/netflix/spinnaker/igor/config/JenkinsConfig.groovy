@@ -123,7 +123,10 @@ class JenkinsConfig {
                                      int timeout = 30000){
 
         Interceptor requestInterceptor = (jenkinsRetrofitRequestInterceptorProvider != null) ? jenkinsRetrofitRequestInterceptorProvider.provide(host): null
-        OkHttpClient.Builder clientBuilder = okHttpClientConfig.createForRetrofit2().readTimeout(timeout, TimeUnit.MILLISECONDS)
+        // Jenkins responds to buildWithParameters with a 303 to the existing queue item when a
+        // non-concurrent job is already queued/running; auto-following it turns that signal into
+        // an indistinguishable 200, so redirects are handled explicitly in JenkinsService instead.
+        OkHttpClient.Builder clientBuilder = okHttpClientConfig.createForRetrofit2().readTimeout(timeout, TimeUnit.MILLISECONDS).followRedirects(false)
         if (requestInterceptor != null) {
           clientBuilder.addInterceptor(requestInterceptor)
         }

@@ -37,9 +37,7 @@ class StartJenkinsJobTaskSpec extends Specification {
   StartJenkinsJobTask task = new StartJenkinsJobTask()
 
   void setup(){
-    task.objectMapper = Mock(ObjectMapper) {
-      convertValue(_,_) >> [:]
-    }
+    task.objectMapper = new ObjectMapper()
 
     task.spinnakerServerExceptionHandler = new SpinnakerServerExceptionHandler()
   }
@@ -112,5 +110,44 @@ class StartJenkinsJobTaskSpec extends Specification {
 
     then:
     result.status == ExecutionStatus.RUNNING
+  }
+
+  def "parses queuedBuild and alreadyQueued from the new JSON response body"() {
+    given:
+    def stage = new StageExecutionImpl(pipeline, "jenkins", [master: "builds", job: "orca"])
+
+    and:
+    task.buildService = Stub(BuildService) {
+      build(stage.context.master, stage.context.job, stage.context.parameters, stage.startTime.toString()) >>
+          Response.success(200, ResponseBody.create(MediaType.parse("application/json"),
+              new ObjectMapper().writeValueAsString([queuedBuild: "42", alreadyQueued: true])))
+    }
+
+    when:
+    def result = task.execute(stage)
+
+    then:
+    result.status == ExecutionStatus.SUCCEEDED
+    result.context.queuedBuild == "42"
+    result.context.alreadyQueued == true
+  }
+
+  def "falls back to treating the response body as a plain queued build id from an old igor"() {
+    given:
+    def stage = new StageExecutionImpl(pipeline, "jenkins", [master: "builds", job: "orca"])
+
+    and:
+    task.buildService = Stub(BuildService) {
+      build(stage.context.master, stage.context.job, stage.context.parameters, stage.startTime.toString()) >>
+          Response.success(200, ResponseBody.create(MediaType.parse("text/plain"), "42"))
+    }
+
+    when:
+    def result = task.execute(stage)
+
+    then:
+    result.status == ExecutionStatus.SUCCEEDED
+    result.context.queuedBuild == "42"
+    !result.context.containsKey("alreadyQueued")
   }
 }

@@ -37,14 +37,18 @@ public class BuildService {
 
   public Response<ResponseBody> build(
       String master, String jobName, Map<String, String> queryParams) {
-    return Retrofit2SyncCall.executeCall(
-        igorService.build(master, encode(jobName), queryParams, ""));
+    return build(master, jobName, queryParams, "");
   }
 
   public Response<ResponseBody> build(
       String master, String jobName, Map<String, String> queryParams, String startTime) {
     return Retrofit2SyncCall.executeCall(
-        igorService.build(master, encode(jobName), queryParams, startTime));
+        igorService.build(
+            master,
+            encode(jobName),
+            queryParams,
+            /* includeQueuedBuildMetadata= */ true,
+            startTime));
   }
 
   public String stop(String master, String jobName, String queuedBuild, Long buildNumber) {

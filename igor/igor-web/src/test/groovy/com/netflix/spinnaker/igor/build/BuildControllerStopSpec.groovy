@@ -15,6 +15,7 @@
  */
 package com.netflix.spinnaker.igor.build
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.netflix.spinnaker.igor.PendingOperationsCache
 import com.netflix.spinnaker.igor.helpers.TestUtils
 import com.netflix.spinnaker.igor.service.BuildOperations
@@ -41,7 +42,8 @@ class BuildControllerStopSpec extends Specification {
       pendingOperationsCache,
       Optional.empty(),
       Optional.empty(),
-      Optional.empty()
+      Optional.empty(),
+      new ObjectMapper()
     )
   }
 

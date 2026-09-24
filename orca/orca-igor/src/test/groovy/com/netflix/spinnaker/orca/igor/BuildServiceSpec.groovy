@@ -42,7 +42,7 @@ class BuildServiceSpec extends Specification {
     buildService.build(MASTER, JOB_NAME, PARAMS)
 
     then:
-    1 * igorService.build(MASTER, JOB_NAME_ENCODED, PARAMS, '') >> Calls.response(null)
+    1 * igorService.build(MASTER, JOB_NAME_ENCODED, PARAMS, true, '') >> Calls.response(null)
   }
 
   void 'getBuild method encodes the job name'() {

@@ -64,10 +64,11 @@ class StartJenkinsJobTask implements RetryableTask {
       }
 
       if (igorResponse.code() == HttpStatus.OK.value()) {
-        String queuedBuild = igorResponse.body().byteStream().text
+        String body = igorResponse.body().byteStream().text
+        Map<String, Object> queuedBuildMetadata = QueuedBuildResponseParser.parse(objectMapper, body)
         return TaskResult
             .builder(ExecutionStatus.SUCCEEDED)
-            .context([queuedBuild: queuedBuild])
+            .context(queuedBuildMetadata)
             .build()
       }
     }

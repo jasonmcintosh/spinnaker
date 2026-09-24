@@ -17,6 +17,7 @@
 
 package com.netflix.spinnaker.igor.build
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.google.common.base.Strings
 import com.netflix.spinnaker.igor.PendingOperationsCache
 import com.netflix.spinnaker.igor.artifacts.ArtifactExtractor
@@ -38,6 +39,7 @@ import com.netflix.spinnaker.kork.web.exceptions.NotFoundException
 import com.netflix.spinnaker.security.AuthenticatedRequest
 import groovy.transform.InheritConstructors
 import groovy.util.logging.Slf4j
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.PathVariable
@@ -64,17 +66,20 @@ class BuildController {
   private ArtifactDecorator artifactDecorator
   private ArtifactExtractor artifactExtractor
   private PendingOperationsCache pendingOperationsCache
+  private ObjectMapper objectMapper
 
   BuildController(BuildServices buildServices,
                   PendingOperationsCache pendingOperationsCache,
                   Optional<BuildArtifactFilter> buildArtifactFilter,
                   Optional<ArtifactDecorator> artifactDecorator,
-                  Optional<ArtifactExtractor> artifactExtractor) {
+                  Optional<ArtifactExtractor> artifactExtractor,
+                  ObjectMapper objectMapper) {
     this.buildServices = buildServices
     this.pendingOperationsCache = pendingOperationsCache
     this.buildArtifactFilter = buildArtifactFilter.orElse(null)
     this.artifactDecorator = artifactDecorator.orElse(null)
     this.artifactExtractor = artifactExtractor.orElse(null)
+    this.objectMapper = objectMapper
   }
 
   @Nullable
@@ -237,14 +242,22 @@ class BuildController {
   ResponseEntity<String> build(
     @PathVariable("name") String master,
     @RequestParam Map<String, String> requestParams,
+    // Set by callers (e.g. orca) that understand the JSON response body used to report a build
+    // that turned out to already be queued/running (see the 303 handling below), so that older
+    // callers expecting a bare build number in the response body are unaffected.
+    @RequestParam(value = "includeQueuedBuildMetadata", required = false, defaultValue = "false") boolean includeQueuedBuildMetadata,
     @RequestBody(required = false) String startTime,
     HttpServletRequest request) {
     def job = ((String) request.getAttribute(
       HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE)).split('/').drop(4).join('/')
+    // requestParams is bound from all query params, so it picks up includeQueuedBuildMetadata too;
+    // it must not be forwarded to Jenkins as a build parameter.
+    requestParams.remove("includeQueuedBuildMetadata")
 
     String pendingKey = computePendingBuildKey(master, job, requestParams, startTime)
     // Initializing buildNumber to null will get it silently casted to "null" down the line
     String buildNumber = ""
+    boolean alreadyQueued = false
 
     PendingOperationsCache.OperationState pendingStatus = pendingOperationsCache.getAndSetOperationStatus(pendingKey, PendingOperationsCache.OperationStatus.PENDING, "")
     if (pendingStatus.status == PendingOperationsCache.OperationStatus.PENDING) {
@@ -256,6 +269,12 @@ class BuildController {
       log.info("Received duplicate request to the start job {}, status: {}, pendingKey: {}", job,
         pendingStatus.status, pendingKey)
       pendingOperationsCache.clear(pendingKey)
+      if (includeQueuedBuildMetadata) {
+        // The cache only retains the build number, not whether it was already queued, so a
+        // retried request that resolves via this cache is reported as a normal (non-shared) build.
+        String body = objectMapper.writeValueAsString([queuedBuild: pendingStatus.value, alreadyQueued: false])
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body)
+      }
       return ResponseEntity.of(Optional.of(pendingStatus.value))
     }
 
@@ -272,35 +291,60 @@ class BuildController {
         if (jobConfig.parameterDefinitionList?.size() > 0) {
           validateJobParameters(jobConfig, requestParams)
         }
-        if (requestParams && jobConfig.parameterDefinitionList?.size() > 0) {
-          response = jenkinsService.buildWithParameters(job, requestParams)
-        } else if (!requestParams && jobConfig.parameterDefinitionList?.size() > 0) {
-          // account for when you just want to fire a job with the default parameter values by adding a dummy param
-          response = jenkinsService.buildWithParameters(job, ['startedBy': "igor"])
-        } else if (!requestParams && (!jobConfig.parameterDefinitionList || jobConfig.parameterDefinitionList.size() == 0)) {
-          response = jenkinsService.build(job)
-        } else { // Jenkins will reject the build, so don't even try
-          // we should throw a BuildJobError, but I get a bytecode error : java.lang.VerifyError: Bad <init> method call from inside of a branch
-          throw new RuntimeException("job : ${job}, passing params to a job which doesn't need them")
+
+        try {
+          if (requestParams && jobConfig.parameterDefinitionList?.size() > 0) {
+            response = jenkinsService.buildWithParameters(job, requestParams)
+          } else if (!requestParams && jobConfig.parameterDefinitionList?.size() > 0) {
+            // account for when you just want to fire a job with the default parameter values by adding a dummy param
+            response = jenkinsService.buildWithParameters(job, ['startedBy': "igor"])
+          } else if (!requestParams && (!jobConfig.parameterDefinitionList || jobConfig.parameterDefinitionList.size() == 0)) {
+            response = jenkinsService.build(job)
+          } else { // Jenkins will reject the build, so don't even try
+            // we should throw a BuildJobError, but I get a bytecode error : java.lang.VerifyError: Bad <init> method call from inside of a branch
+            throw new RuntimeException("job : ${job}, passing params to a job which doesn't need them")
+          }
+        } catch (SpinnakerHttpException e) {
+          // Jenkins returns 303 (redirecting to the existing queue item) instead of 201 when a
+          // non-concurrent job is already queued/running with compatible parameters. Only resolve
+          // that here for callers that opted in via includeQueuedBuildMetadata=true; other callers
+          // keep receiving the pre-existing non-201 failure below, unchanged.
+          if (!includeQueuedBuildMetadata || e.getResponseCode() != 303) {
+            throw e
+          }
+          String location = e.getHeaders().getFirst("location")
+          if (!location) {
+            throw new QueuedJobDeterminationError("Could not find Location header for job '${job}'")
+          }
+          buildNumber = location.split('/')[-1]
+          alreadyQueued = true
+          log.warn("Job '{}' on master '{}' is already queued/running (queue item {}); attaching to the existing build instead of starting a new one", job, master, buildNumber)
         }
 
-        if (response.code() != 201) {
-          throw new BuildJobError("Received a non-201 status when submitting job '${job}' to master '${master}'")
-        }
+        if (!alreadyQueued) {
+          if (response.code() != 201) {
+            throw new BuildJobError("Received a non-201 status when submitting job '${job}' to master '${master}'")
+          }
 
-        log.info("Submitted build job '{}'", kv("job", job))
-        def locationHeader = response.headers().get("location")
-        if (!locationHeader) {
-          throw new QueuedJobDeterminationError("Could not find Location header for job '${job}'")
-        }
+          log.info("Submitted build job '{}'", kv("job", job))
+          def locationHeader = response.headers().get("location")
+          if (!locationHeader) {
+            throw new QueuedJobDeterminationError("Could not find Location header for job '${job}'")
+          }
 
-        buildNumber = locationHeader.split('/')[-1]
+          buildNumber = locationHeader.split('/')[-1]
+        }
       } else {
         buildNumber = buildService.triggerBuildWithParameters(job, requestParams)
       }
     }
     finally {
       pendingOperationsCache.setOperationStatus(pendingKey, PendingOperationsCache.OperationStatus.COMPLETED, buildNumber)
+    }
+
+    if (includeQueuedBuildMetadata) {
+      String body = objectMapper.writeValueAsString([queuedBuild: buildNumber, alreadyQueued: alreadyQueued])
+      return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body)
     }
 
     return ResponseEntity.of(Optional.of(buildNumber))

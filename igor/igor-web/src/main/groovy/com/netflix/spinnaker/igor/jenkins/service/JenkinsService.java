@@ -187,9 +187,36 @@ public class JenkinsService implements BuildOperations, BuildProperties, Stoppab
 
   @Override
   public long triggerBuildWithParameters(String job, Map<String, String> queryParameters) {
-    Response<Void> response = buildWithParameters(job, queryParameters);
+    Response<Void> response;
+    try {
+      response = buildWithParameters(job, queryParameters);
+    } catch (SpinnakerHttpException e) {
+      // Jenkins returns 303 (redirecting to the existing queue item) instead of 201 when a
+      // non-concurrent job is already queued/running with compatible parameters. This interface
+      // method has no channel to signal "already queued" back to the caller, so the best we can
+      // do here is resolve and return the existing queue item id.
+      if (e.getResponseCode() != 303) {
+        throw e;
+      }
+      String location = e.getHeaders().getFirst("location");
+      if (location == null) {
+        throw new QueuedJobDeterminationError(
+            "Could not find Location header for job '" + job + "'");
+      }
+      log.warn(
+          "Job '{}' on master '{}' is already queued/running (queue item {}); attaching to the existing build instead of starting a new one",
+          job,
+          serviceName,
+          location);
+      int lastSlash = location.lastIndexOf('/');
+      return Long.parseLong(location.substring(lastSlash + 1));
+    }
+
     if (response.code() != 201) {
-      throw new BuildJobError("Received a non-201 status when submitting job '" + job + "'");
+      throw new BuildJobError(
+          "Received an unexpected status when submitting job '"
+              + job
+              + "': expected 201 (queued) or 303 (redirected to an existing queue item)");
     }
 
     log.info("Submitted build job '{}'", kv("job", job));

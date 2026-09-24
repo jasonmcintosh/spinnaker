@@ -70,7 +70,7 @@ class BuildServiceSpecMock extends Specification{
 
   def "build starts a Jenkins job"() {
     String queryMap = PARAMS.collect { k, v -> "$k=$v" }.join('&')
-    String uriPath = "/masters/$MASTER/jobs/$JOB_NAME_ENCODED?$queryMap"
+    String uriPath = "/masters/$MASTER/jobs/$JOB_NAME_ENCODED?$queryMap&includeQueuedBuildMetadata=true"
     stubFor(put(uriPath)
         .willReturn(
             aResponse()
