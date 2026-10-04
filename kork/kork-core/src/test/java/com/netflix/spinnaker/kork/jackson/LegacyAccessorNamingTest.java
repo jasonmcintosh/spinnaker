@@ -157,4 +157,14 @@ class LegacyAccessorNamingTest {
 
     assertThat(read.getOAuthScopes()).isNull();
   }
+
+  /** AccountDefinitionMapper and similar callers derive their mapper with rebuild(). */
+  @Test
+  void rebuiltMappersKeepLegacyNaming() throws Exception {
+    ObjectMapper derived = legacy.rebuild().enable(MapperFeature.USE_GETTERS_AS_SETTERS).build();
+    Account account = new Account();
+    account.setOAuthScopes(List.of("s1"));
+
+    assertThat(derived.writeValueAsString(account)).contains("\"oauthScopes\"");
+  }
 }
