@@ -103,12 +103,10 @@ class SqlConfiguration {
     registry: Registry,
     subtypeLocators: List<SubtypeLocator>
   ): EventRepository {
-    // TODO(rz): ObjectMapperSubtypeConfigurer should become a standard kork feature. This is pretty gross.
-    ObjectMapperSubtypeConfigurer(true).registerSubtypes(objectMapper, subtypeLocators)
     return SqlEventRepository(
       jooq,
       serviceVersion,
-      objectMapper,
+      withEventSubtypes(objectMapper, subtypeLocators),
       applicationEventPublisher,
       registry
     ).let {
@@ -135,4 +133,15 @@ class SqlConfiguration {
     mapper: AccountDefinitionMapper
   ): AccountDefinitionRepository = SqlAccountDefinitionRepository(jooq, mapper, clock, ConnectionPools.ACCOUNTS.value)
 
+  companion object {
+    /**
+     * Jackson 3 mappers are immutable: [ObjectMapperSubtypeConfigurer.registerSubtypes] returns a
+     * configured copy and leaves the mapper it was given untouched (Jackson 2 mutated it in place).
+     * The returned mapper must be the one handed to the repository, or events can be written but
+     * never read back ("Could not resolve type id ...").
+     */
+    @JvmStatic
+    fun withEventSubtypes(objectMapper: ObjectMapper, subtypeLocators: List<SubtypeLocator>): ObjectMapper =
+      ObjectMapperSubtypeConfigurer(true).registerSubtypes(objectMapper, subtypeLocators)
+  }
 }
