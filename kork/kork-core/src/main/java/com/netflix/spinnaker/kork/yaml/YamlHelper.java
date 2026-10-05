@@ -11,6 +11,7 @@ import org.yaml.snakeyaml.constructor.Constructor;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.representer.Representer;
 import tools.jackson.dataformat.yaml.YAMLFactory;
+import tools.jackson.dataformat.yaml.YAMLFactoryBuilder;
 import tools.jackson.dataformat.yaml.YAMLReadFeature;
 
 /**
@@ -153,10 +154,10 @@ public class YamlHelper {
             .setCodePointLimit(opts.getCodePointLimit())
             .setAllowDuplicateKeys(true)
             .build();
-    return YAMLFactory.builder()
-        .loadSettings(settings)
-        .enable(YAMLReadFeature.EMPTY_STRING_AS_NULL)
-        .build();
+    YAMLFactoryBuilder builder =
+        YAMLFactory.builder().loadSettings(settings).enable(YAMLReadFeature.EMPTY_STRING_AS_NULL);
+    boolean yaml11Scalars = props == null || !Boolean.FALSE.equals(props.getYaml11Scalars());
+    return yaml11Scalars ? new Yaml11CompatYAMLFactory(builder) : builder.build();
   }
 
   // ---------------------------------------------------------------------------

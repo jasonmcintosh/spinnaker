@@ -18,7 +18,12 @@ package com.netflix.spinnaker.kork.yaml;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.snakeyaml.engine.v2.api.LoadSettings;
 import tools.jackson.core.JacksonException;
@@ -32,11 +37,8 @@ class YamlHelperJacksonFactoryTest {
       List.of(
           "v:",
           "v: ",
-          "v: ~",
           "v: null",
-          "v: yes",
           "v: true",
-          "v: 0644",
           "v: 1e3",
           "dup: 1\ndup: 2",
           "list:\n- a\n-\n- c",
@@ -90,5 +92,76 @@ class YamlHelperJacksonFactoryTest {
 
     assertThatThrownBy(() -> limited.readValue("key: " + "x".repeat(64), Object.class))
         .isInstanceOf(JacksonException.class);
+  }
+
+  private static String describe(ObjectMapper mapper, String scalar) {
+    try {
+      Object value = ((Map<?, ?>) mapper.readValue("v: " + scalar, Object.class)).get("v");
+      return value == null ? "null" : value.getClass().getSimpleName() + ":" + value;
+    } catch (JacksonException e) {
+      return "ERR";
+    }
+  }
+
+  private static List<String[]> jackson2Golden() throws Exception {
+    List<String[]> rows = new ArrayList<>();
+    try (BufferedReader reader =
+        new BufferedReader(
+            new InputStreamReader(
+                YamlHelperJacksonFactoryTest.class.getResourceAsStream(
+                    "/yaml/jackson2-scalar-golden.tsv"),
+                StandardCharsets.UTF_8))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (!line.isEmpty() && !line.startsWith("#")) {
+          rows.add(line.split("\t", 2));
+        }
+      }
+    }
+    return rows;
+  }
+
+  /**
+   * The golden file holds what a stock Jackson 2.21 YAMLMapper returned for each plain scalar: YAML
+   * 1.1 booleans and nulls, octal/hex/binary, underscores, signs and short floats.
+   */
+  @Test
+  void plainScalarsReadLikeJackson2() throws Exception {
+    List<String[]> golden = jackson2Golden();
+    assertThat(golden).hasSizeGreaterThan(100);
+
+    List<String> mismatches = new ArrayList<>();
+    for (String[] row : golden) {
+      String actual = describe(helperMapper, row[0]);
+      if (!actual.equals(row[1])) {
+        mismatches.add(row[0] + ": expected " + row[1] + " but was " + actual);
+      }
+    }
+    assertThat(mismatches).isEmpty();
+  }
+
+  @Test
+  void jackson3AloneDisagreesWithJackson2OnMany() throws Exception {
+    long different =
+        jackson2Golden().stream().filter(r -> !describe(plainMapper, r[0]).equals(r[1])).count();
+
+    assertThat(different).isGreaterThan(40);
+  }
+
+  @Test
+  void quotedAndTaggedScalarsAreNotRewritten() {
+    assertThat(read(helperMapper, "v: 'yes'")).isEqualTo("{v=yes}");
+    assertThat(read(helperMapper, "v: \"0644\"")).isEqualTo("{v=0644}");
+    assertThat(read(helperMapper, "v: !!str ~")).isEqualTo("{v=~}");
+    assertThat(read(helperMapper, "yes: x")).isEqualTo("{yes=x}");
+  }
+
+  @Test
+  void yaml11ScalarsCanBeDisabled() {
+    YamlParserProperties props = new YamlParserProperties();
+    props.setYaml11Scalars(false);
+    ObjectMapper yaml12 = YAMLMapper.builder(new YamlHelper(props).yamlFactory()).build();
+
+    assertThat(read(yaml12, "v: yes")).isEqualTo("{v=yes}");
   }
 }

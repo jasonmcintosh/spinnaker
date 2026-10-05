@@ -32,7 +32,7 @@ final class YamlObjectMapperFactory {
   }
 
   static ObjectMapper create(ObjectMapper objectMapper) {
-    return copyConfig(YAMLMapper.builder(), objectMapper);
+    return copyConfig(YAMLMapper.builder(YamlHelper.newYamlFactory()), objectMapper);
   }
 
   /**

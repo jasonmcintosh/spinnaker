@@ -59,22 +59,20 @@ class YamlObjectMapperFactoryTest {
     assertThat(scalar("'yes'")).isEqualTo("yes");
   }
 
-  /**
-   * Behavior change to call out in release notes: each assertion shows the Jackson 2 value in the
-   * trailing comment.
-   */
+  /** Jackson 3 alone leaves these as strings; the factory keeps the Jackson 2 values. */
   @Test
-  void yaml11ScalarsAreStringsUnderJackson3() throws Exception {
-    assertThat(scalar("yes")).isEqualTo("yes"); // J2: true
-    assertThat(scalar("on")).isEqualTo("on"); // J2: true
-    assertThat(scalar("No")).isEqualTo("No"); // J2: false
-    assertThat(scalar("True")).isEqualTo("True"); // J2: true
-    assertThat(scalar("TRUE")).isEqualTo("TRUE"); // J2: true
-    assertThat(scalar("~")).isEqualTo("~"); // J2: null
-    assertThat(scalar("Null")).isEqualTo("Null"); // J2: null
-    assertThat(scalar("0644")).isEqualTo("0644"); // J2: 420 (octal)
-    assertThat(scalar("0xFF")).isEqualTo("0xFF"); // J2: 255
-    assertThat(scalar("1_000")).isEqualTo("1_000"); // J2: 1000
+  void yaml11ScalarsReadLikeJackson2() throws Exception {
+    assertThat(scalar("yes")).isEqualTo(true);
+    assertThat(scalar("on")).isEqualTo(true);
+    assertThat(scalar("No")).isEqualTo(false);
+    assertThat(scalar("True")).isEqualTo(true);
+    assertThat(scalar("TRUE")).isEqualTo(true);
+    assertThat(scalar("~")).isNull();
+    assertThat(scalar("Null")).isNull();
+    assertThat(scalar("0644")).isEqualTo(420);
+    assertThat(scalar("0xFF")).isEqualTo(255);
+    assertThat(scalar("1_000")).isEqualTo(1000);
+    assertThat(scalar("'yes'")).isEqualTo("yes");
   }
 
   /**

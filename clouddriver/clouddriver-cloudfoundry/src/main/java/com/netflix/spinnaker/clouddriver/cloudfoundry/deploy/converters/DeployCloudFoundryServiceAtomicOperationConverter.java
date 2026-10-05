@@ -52,7 +52,7 @@ import tools.jackson.dataformat.yaml.YAMLMapper;
 public class DeployCloudFoundryServiceAtomicOperationConverter
     extends AbstractCloudFoundryAtomicOperationConverter {
   private static final ObjectMapper objectMapper =
-      YAMLMapper.builder()
+      YAMLMapper.builder(YamlHelper.newYamlFactory())
           .propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
           .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
           .build();
