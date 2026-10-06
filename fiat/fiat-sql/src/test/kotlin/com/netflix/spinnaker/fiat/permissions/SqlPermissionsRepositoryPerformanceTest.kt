@@ -262,6 +262,14 @@ internal class SqlPermissionsRepositoryPerformanceTest {
     s.clear()
     val resyncMs = timed { fixture.repository.putAllById(permissions) }
     report("$label unchanged resync putAllById($userCount users)", s, resyncMs)
+    if (fixture.jooq.dialect() == SQLDialect.POSTGRES) {
+      val bytes =
+        fixture.jooq.fetchValue(
+          "select pg_total_relation_size('fiat_permission') + pg_total_relation_size('fiat_resource') + " +
+            "pg_total_relation_size('fiat_user')"
+        ) as Number
+      log.info("PERF [sql storage] fiat_* tables and indexes: {} MB", bytes.toLong() / (1024 * 1024))
+    }
     assertTrue(s.permissionSelects() <= maxUserReads, "batched PERMISSION reads on an unchanged resync")
   }
 
@@ -357,6 +365,11 @@ internal class SqlPermissionsRepositoryPerformanceTest {
         line("getAllById", timed { repository.getAllById() })
         line("getAllByRoles([role0])", timed { repository.getAllByRoles(listOf("role0")) })
         line("single-user put", timed { repository.put(permissions.getValue("user0")) })
+
+        pool.resource.use { jedis ->
+          val used = Regex("used_memory:(\\d+)").find(jedis.info("memory"))?.groupValues?.get(1)?.toLong() ?: 0L
+          log.info("PERF [redis storage] used_memory: {} MB, keys: {}", used / (1024 * 1024), jedis.dbSize())
+        }
 
         val samples = minOf(20, userCount)
         var loaded = 0
