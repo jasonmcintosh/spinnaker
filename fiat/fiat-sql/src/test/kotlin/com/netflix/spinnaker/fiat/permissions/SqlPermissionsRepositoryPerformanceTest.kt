@@ -30,6 +30,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import kotlin.contracts.ExperimentalContracts
 import kotlinx.coroutines.asCoroutineDispatcher
+import com.netflix.spinnaker.kork.jedis.JedisClientDelegate
+import io.github.resilience4j.retry.RetryRegistry
 import org.jooq.DSLContext
 import org.jooq.ExecuteContext
 import org.jooq.SQLDialect
@@ -40,6 +42,9 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty
 import org.slf4j.LoggerFactory
+import org.testcontainers.containers.GenericContainer
+import org.testcontainers.utility.DockerImageName
+import redis.clients.jedis.JedisPool
 
 /**
  * Baseline measurements for the SQL hot paths described in fiat-performance-fix.md.
@@ -322,4 +327,46 @@ internal class SqlPermissionsRepositoryPerformanceTest {
   @Test
   @EnabledIfSystemProperty(named = "fiat.perf.mysql", matches = "true")
   fun `mysql cost at scale`() = run("mysql", fixture("jdbc:tc:mysql:8.0.40:///perfdb", SQLDialect.MYSQL))
+
+  /**
+   * The same operations against RedisPermissionsRepository (Valkey 8, as its own tests use) with its
+   * production defaults, for a like-for-like comparison with the SQL numbers. Redis has no statement
+   * counter here, so only wall time is reported.
+   */
+  @Test
+  fun `redis cost at scale`() {
+    GenericContainer<Nothing>(DockerImageName.parse("valkey/valkey:8")).apply { withExposedPorts(6379) }.use { valkey ->
+      valkey.start()
+      JedisPool(valkey.host, valkey.getMappedPort(6379)).use { pool ->
+        val props = RedisPermissionRepositoryConfigProps().apply { prefix = "perf" }
+        val repository =
+          RedisPermissionsRepository(
+            ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL),
+            JedisClientDelegate(pool),
+            listOf(Application(), Account(), BuildService(), ServiceAccount(), Role()),
+            props,
+            RetryRegistry.ofDefaults()
+          )
+        val permissions = users()
+
+        fun line(what: String, ms: Long) =
+          log.info("PERF [redis syncThreads={}] {} elapsedMs={}", props.repository.syncThreads, what, ms)
+
+        line("initial putAllById($userCount users)", timed { repository.putAllById(permissions) })
+        line("unchanged resync putAllById($userCount users)", timed { repository.putAllById(permissions) })
+        line("getAllById", timed { repository.getAllById() })
+        line("getAllByRoles([role0])", timed { repository.getAllByRoles(listOf("role0")) })
+        line("single-user put", timed { repository.put(permissions.getValue("user0")) })
+
+        val samples = minOf(20, userCount)
+        var loaded = 0
+        val ms =
+          timed {
+            repeat(samples) { loaded += repository.get("user${it * (userCount / samples)}").get().roles.size }
+          }
+        line("get() x$samples (avgMs=${ms / samples}, avgRoles=${loaded / samples})", ms)
+        assertTrue(loaded / samples >= rolesPerUser, "redis get() returns every role for the user")
+      }
+    }
+  }
 }

@@ -51,6 +51,11 @@ dependencies {
 
     // Only used for Initializing Datasource. For actual CRUD, test containers preferred.
     testImplementation "com.h2database:h2"
+
+    // The opt-in performance harness also runs RedisPermissionsRepository on the same data.
+    testImplementation "io.spinnaker.kork:kork-jedis"
+    testImplementation "redis.clients:jedis"
+    testImplementation "org.testcontainers:testcontainers"
 }
 
 // Lets `-Dfiat.perf.enabled=true -Dfiat.perf.users=500` etc. reach SqlPermissionsRepositoryPerformanceTest.
