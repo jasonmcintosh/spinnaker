@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: user-permissions-hash
+      author: fiat
+      changes:
+        - addColumn:
+            tableName: fiat_user
+            columns:
+              - column:
+                  name: permissions_hash
+                  type: char(64)
+      rollback:
+        - dropColumn:
+            tableName: fiat_user
+            columns:
+              - column:
+                  name: permissions_hash

@@ -73,6 +73,16 @@ class SqlPermissionsRepository(
 
         private const val NO_UPDATED_AT = 0L
 
+        /**
+         * When on (the default), a user whose digest matches the stored one is skipped entirely. Turn
+         * off to force every user to be rewritten, e.g. when rolling back to a Fiat version that does
+         * not maintain digests, since such a version can change a user's rows without updating the hash.
+         */
+        private const val SKIP_UNCHANGED_USERS_FLAG = "permissions-repository.sql.skip-unchanged-users"
+
+        /** Included in every digest; changing it makes the next sync rewrite every user. */
+        private const val DIGEST_GENERATION_KEY = "permissions-repository.sql.digest-generation"
+
         private val fallbackLastModified = AtomicReference<Long>(null)
     }
 
@@ -97,7 +107,10 @@ class SqlPermissionsRepository(
         // Non-null only when this sync is big enough to be worth running concurrently.
         val asyncContext = if (coroutineContext.useAsync(permissions.size, this::useAsync)) coroutineContext else null
 
-        // Fetch existing permission rows for a batch of users in one query rather than one per user.
+        val skipUnchanged = dynamicConfigService.isEnabled(SKIP_UNCHANGED_USERS_FLAG, true)
+
+        // Read per-batch rather than per-user: stored digests, then the existing permission rows of the
+        // users whose digest says they need rewriting.
         val existingPermissionsBatchSize = dynamicConfigService.getConfig(
             Int::class.java,
             "permissions-repository.sql.existing-permissions-batch-size",
@@ -105,16 +118,24 @@ class SqlPermissionsRepository(
         )
 
         permissions.values.chunked(existingPermissionsBatchSize).forEach { batch ->
-            val existing = getUserPermissionsRecords(batch.map { it.id })
+            val pending = batch.map { PendingUser(it, it.allResources) }
+
+            val storedDigests = if (skipUnchanged) getPermissionsHashes(batch.map { it.id }) else emptyMap()
+            val changed = pending.filter { storedDigests[it.permission.id] != it.digest }
+            if (changed.isEmpty()) {
+                return@forEach
+            }
+
+            val existing = getUserPermissionsRecords(changed.map { it.permission.id })
 
             if (asyncContext != null) {
-                batch.chunked(
+                changed.chunked(
                     dynamicConfigService.getConfig(Int::class.java, "permissions-repository.sql.max-query-concurrency", 4)
                 ).forEach { chunk ->
                     val scope = SqlCoroutineScope(asyncContext)
 
                     val deferred = chunk.map {
-                        scope.async { putUserPermission(it, existing[it.id].orEmpty()) }
+                        scope.async { syncUser(it, existing[it.permission.id].orEmpty()) }
                     }
 
                     runBlocking {
@@ -122,8 +143,59 @@ class SqlPermissionsRepository(
                     }
                 }
             } else {
-                batch.forEach { putUserPermission(it, existing[it.id].orEmpty()) }
+                changed.forEach { syncUser(it, existing[it.permission.id].orEmpty()) }
             }
+        }
+    }
+
+    /** A user being synced, with the fingerprint of everything this repository stores for them. */
+    private inner class PendingUser(val permission: UserPermission, val resources: Set<Resource>) {
+        val digest: String = digest(permission, resources)
+    }
+
+    /**
+     * Fingerprint of the stored state of a user: the flags on the user row plus the set of
+     * (type, name) permission rows. Resource bodies are not included; they are keyed and hashed
+     * separately in the resource table.
+     */
+    private fun digest(permission: UserPermission, resources: Set<Resource>): String {
+        val hasher = Hashing.sha256().newHasher()
+            .putString("v${dynamicConfigService.getConfig(String::class.java, DIGEST_GENERATION_KEY, "1")}\n", Charsets.UTF_8)
+            .putBoolean(permission.isAdmin)
+            .putBoolean(permission.isAccountManager)
+        resources
+            .map { "${it.resourceType.name}:${it.name.toLowerCase()}" }
+            .sorted()
+            .forEach { hasher.putString(it, Charsets.UTF_8).putChar('\n') }
+        return hasher.hash().toString()
+    }
+
+    /**
+     * Writes the user, then their permissions, then records the digest. The digest goes last, and only
+     * if every step succeeded, so a failed or partial write is retried by the next sync instead of
+     * being mistaken for up to date.
+     */
+    private fun syncUser(pending: PendingUser, existingPermissions: Set<ResourceId>) {
+        putUserPermission(pending.permission, pending.resources, existingPermissions)
+            .takeIf { it }
+            ?.let { putPermissionsHash(pending.permission.id, pending.digest) }
+    }
+
+    private fun getPermissionsHashes(userIds: Collection<String>): Map<String, String> =
+        withRetry(RetryCategory.READ) {
+            jooq
+                .select(USER.ID, USER.PERMISSIONS_HASH)
+                .from(USER)
+                .where(USER.ID.`in`(userIds).and(USER.PERMISSIONS_HASH.isNotNull))
+                .fetchMap(USER.ID, USER.PERMISSIONS_HASH)
+        }
+
+    private fun putPermissionsHash(userId: String, hash: String) {
+        withRetry(RetryCategory.WRITE) {
+            jooq.update(USER)
+                .set(USER.PERMISSIONS_HASH, hash)
+                .where(USER.ID.eq(userId))
+                .execute()
         }
     }
 
@@ -237,7 +309,7 @@ class SqlPermissionsRepository(
             .mapValues { record -> record.value.mapNotNull { allRoles[it] }.toSet() }
     }
 
-    private fun putUserPermission(permission: UserPermission, existingPermissions: Set<ResourceId>) {
+    private fun putUserPermission(permission: UserPermission, resources: Set<Resource>, existingPermissions: Set<ResourceId>): Boolean {
         val insert = jooq.insertInto(USER, USER.ID, USER.ADMIN, USER.ACCOUNT_MANAGER, USER.UPDATED_AT)
 
         insert.apply {
@@ -262,10 +334,11 @@ class SqlPermissionsRepository(
             insert.execute()
         }
 
-        putUserPermissions(permission.id, permission.allResources, existingPermissions)
+        return putUserPermissions(permission.id, resources, existingPermissions)
     }
 
-    private fun putUserPermissions(id: String, resources: Set<Resource>, existingPermissions: Set<ResourceId>) {
+    /** @return false if stale permission rows could not be removed (the caller must not record the user as synced) */
+    private fun putUserPermissions(id: String, resources: Set<Resource>, existingPermissions: Set<ResourceId>): Boolean {
         val writeBatchSize = dynamicConfigService.getConfig(Int::class.java, "permissions-repository.sql.write-batch-size", 100)
 
         val currentPermissions = mutableSetOf<ResourceId>() // current permissions from request
@@ -325,8 +398,10 @@ class SqlPermissionsRepository(
                         }
                     }
                 }
+            return true
         } catch (e: Exception) {
             log.error("error deleting old permissions", e)
+            return false
         }
     }
 
